@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>预置课表管理</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #0f172a;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .preset-card {
+            max-width: 1100px;
+            width: 100%;
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px black;
+            padding: 32px 36px;
+        }
+        h2 {
+            font-size: 2rem;
+            color: #0f172a;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 28px;
+            border-left: 8px solid #3b82f6;
+            padding-left: 24px;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid #2563eb;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .danger-btn {
+            background: #ef4444;
+            border-color: #b91c1c;
+        }
+        .danger-btn:hover {
+            background: #b91c1c;
+        }
+        .course-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            overflow: hidden;
+        }
+        .course-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 24px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .course-item:last-child {
+            border-bottom: none;
+        }
+        .course-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 18px;
+            font-size: 1rem;
+        }
+        .badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 12px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        .delete-btn {
+            background: none;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .delete-btn:hover {
+            background: #fee2e2;
+        }
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .modal.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background: white;
+            width: 90%;
+            max-width: 600px;
+            border-radius: 40px;
+            padding: 32px;
+        }
+        .field-row {
+            margin-bottom: 24px;
+        }
+        .field-row label {
+            font-weight: 500;
+            color: #334155;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .row-flex {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+        .row-flex input[type="number"] {
+            width: 110px;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 24px;
+            font-size: 1rem;
+        }
+        .radio-group, .week-grid {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            margin-top: 6px;
+        }
+        .radio-group label, .week-grid label {
+            background: #f1f5f9;
+            padding: 10px 18px;
+            border-radius: 36px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+        }
+        .period-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin: 12px 0 8px;
+        }
+        .period-btn {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .period-btn.selected {
+            background: #bfdbfe;
+            border-color: #3b82f6;
+        }
+        .period-actions {
+            display: flex;
+            gap: 10px;
+            margin: 8px 0 16px;
+        }
+        .period-actions button {
+            background: #e2e8f0;
+            color: #1e293b;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 30px;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 32px;
+        }
+        .modal-actions .cancel {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .info-text {
+            color: #475569;
+            font-size: 0.9rem;
+            margin: 4px 0 0;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .back-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="preset-card">
+        <div class="back-link">
+            <a href="/admin">← 返回管理后台</a>
+        </div>
+        <h2>📋 预置课表管理</h2>
+        <div class="toolbar">
+            <div class="btn-group">
+                <button id="addPresetBtn">➕ 添加预置课程</button>
+                <button id="clearAllBtn" class="danger-btn">🗑️ 清空所有预置课程</button>
+            </div>
+            <span id="courseCount" style="color:#64748b;">共 0 门课程</span>
+        </div>
+        <ul class="course-list" id="presetList">
+            <li style="padding: 32px; text-align: center; color: #64748b;">加载中...</li>
+        </ul>
+    </div>
+
+    <!-- 添加课程模态框 -->
+    <div class="modal" id="presetModal">
+        <div class="modal-content">
+            <h3>➕ 添加预置课程</h3>
+            <div class="field-row">
+                <label>📅 起止周</label>
+                <div class="row-flex">
+                    <input type="number" id="startWeek" min="1" value="1" placeholder="开始周">
+                    <span style="align-self:center;">—</span>
+                    <input type="number" id="endWeek" min="1" value="16" placeholder="结束周">
+                </div>
+            </div>
+            <div class="field-row">
+                <label>🔁 单双周</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="weekType" value="all" checked> 全部</label>
+                    <label><input type="radio" name="weekType" value="odd"> 单周</label>
+                    <label><input type="radio" name="weekType" value="even"> 双周</label>
+                </div>
+            </div>
+            <div class="field-row">
+                <label>📆 上课星期 (单选)</label>
+                <div class="week-grid">
+                    <label><input type="radio" name="weekday" value="1" checked> 周一</label>
+                    <label><input type="radio" name="weekday" value="2"> 周二</label>
+                    <label><input type="radio" name="weekday" value="3"> 周三</label>
+                    <label><input type="radio" name="weekday" value="4"> 周四</label>
+                    <label><input type="radio" name="weekday" value="5"> 周五</label>
+                    <label><input type="radio" name="weekday" value="6"> 周六</label>
+                    <label><input type="radio" name="weekday" value="7"> 周日</label>
+                </div>
+            </div>
+            <div class="field-row">
+                <label>⏰ 节次范围</label>
+                <div class="period-grid" id="periodGrid"></div>
+                <div class="period-actions">
+                    <button id="setStartBtn">⚡设为开始节次</button>
+                    <button id="setEndBtn">🎯设为结束节次</button>
+                </div>
+                <div class="row-flex">
+                    <input type="number" id="startPeriod" min="1" max="12" value="1" placeholder="开始节次">
+                    <span>—</span>
+                    <input type="number" id="endPeriod" min="1" max="12" value="2" placeholder="结束节次">
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="cancel" id="closeModalBtn">取消</button>
+                <button class="confirm" id="savePresetBtn">保存课程</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                // DOM 元素
+                const presetList = document.getElementById('presetList');
+                const addBtn = document.getElementById('addPresetBtn');
+                const clearAllBtn = document.getElementById('clearAllBtn');
+                const modal = document.getElementById('presetModal');
+                const closeModalBtn = document.getElementById('closeModalBtn');
+                const saveBtn = document.getElementById('savePresetBtn');
+                const courseCountSpan = document.getElementById('courseCount');
+
+                // 模态框内元素
+                const startWeekInp = document.getElementById('startWeek');
+                const endWeekInp = document.getElementById('endWeek');
+                const weekTypeRadios = document.getElementsByName('weekType');
+                const weekdayRadios = document.getElementsByName('weekday');
+                const startPeriodInp = document.getElementById('startPeriod');
+                const endPeriodInp = document.getElementById('endPeriod');
+                const periodGrid = document.getElementById('periodGrid');
+                const setStartBtn = document.getElementById('setStartBtn');
+                const setEndBtn = document.getElementById('setEndBtn');
+
+                let presetCourses = [];
+                let selectedPeriod = 1;
+
+                // 初始化节次网格
+                function buildPeriodGrid() {
+                    periodGrid.innerHTML = '';
+                    for (let i = 1; i <= 12; i++) {
+                        const btn = document.createElement('button');
+                        btn.className = 'period-btn';
+                        btn.textContent = i;
+                        btn.dataset.period = i;
+                        btn.addEventListener('click', (e) => {
+                            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+                            e.target.classList.add('selected');
+                            selectedPeriod = i;
+                        });
+                        periodGrid.appendChild(btn);
+                    }
+                    if (periodGrid.children[0]) periodGrid.children[0].classList.add('selected');
+                }
+                buildPeriodGrid();
+
+                setStartBtn.addEventListener('click', () => {
+                    startPeriodInp.value = selectedPeriod;
+                });
+                setEndBtn.addEventListener('click', () => {
+                    endPeriodInp.value = selectedPeriod;
+                });
+
+                // 加载预置课程列表
+                async function loadPresetCourses() {
+                    try {
+                        const res = await fetch('/api/preset_courses');
+                        if (res.status === 401) {
+                            alert('登录已过期，请重新登录');
+                            window.location.href = '/admin';
+                            return;
+                        }
+                        if (!res.ok) throw new Error('加载失败');
+                        presetCourses = await res.json();
+                        renderPresetList();
+                    } catch (e) {
+                        console.error(e);
+                        presetList.innerHTML = '<li style="padding:32px; text-align:center; color:#ef4444;">加载失败</li>';
+                    }
+                }
+
+                // 渲染列表（按星期和节次排序）
+                function renderPresetList() {
+                    if (presetCourses.length === 0) {
+                        presetList.innerHTML = '<li style="padding: 32px; text-align: center; color: #64748b;">暂无预置课程，点击上方添加</li>';
+                        courseCountSpan.textContent = '共 0 门课程';
+                        return;
+                    }
+                    // 排序
+                    const sorted = [...presetCourses].sort((a, b) => {
+                        if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+                        return a.startPeriod - b.startPeriod;
+                    });
+                    let html = '';
+                    sorted.forEach(c => {
+                        const weekMap = { 'all':'全部', 'odd':'单周', 'even':'双周' };
+                        const wdStr = ['周一','周二','周三','周四','周五','周六','周日'][c.weekday-1] || '?';
+                        html += `<li class="course-item" data-id="${c.id}">
+                            <div class="course-info">
+                                <span class="badge">第${c.startWeek}-${c.endWeek}周</span>
+                                <span class="badge">${weekMap[c.weekType]}</span>
+                                <span class="badge">${wdStr}</span>
+                                <span class="badge">第${c.startPeriod}-${c.endPeriod}节</span>
+                            </div>
+                            <button class="delete-btn" data-id="${c.id}">✕</button>
+                        </li>`;
+                    });
+                    presetList.innerHTML = html;
+                    courseCountSpan.textContent = `共 ${presetCourses.length} 门课程`;
+                }
+
+                // 添加课程
+                addBtn.addEventListener('click', () => {
+                    // 重置表单
+                    startWeekInp.value = 1;
+                    endWeekInp.value = 16;
+                    document.querySelector('input[name="weekType"][value="all"]').checked = true;
+                    document.querySelector('input[name="weekday"][value="1"]').checked = true;
+                    startPeriodInp.value = 1;
+                    endPeriodInp.value = 2;
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+                    if (periodGrid.children[0]) periodGrid.children[0].classList.add('selected');
+                    selectedPeriod = 1;
+                    modal.classList.add('show');
+                });
+
+                // 关闭模态框
+                closeModalBtn.addEventListener('click', () => {
+                    modal.classList.remove('show');
+                });
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.classList.remove('show');
+                });
+
+                // 保存预置课程
+                saveBtn.addEventListener('click', async () => {
+                    const startWeek = parseInt(startWeekInp.value);
+                    const endWeek = parseInt(endWeekInp.value);
+                    if (startWeek > endWeek || startWeek < 1) {
+                        alert('开始周必须≤结束周且≥1');
+                        return;
+                    }
+                    let weekType = 'all';
+                    for (let r of weekTypeRadios) if (r.checked) weekType = r.value;
+                    let weekday = 1;
+                    for (let r of weekdayRadios) if (r.checked) weekday = parseInt(r.value);
+                    const startPeriod = parseInt(startPeriodInp.value);
+                    const endPeriod = parseInt(endPeriodInp.value);
+                    if (startPeriod > endPeriod || startPeriod < 1 || endPeriod > 12) {
+                        alert('节次范围不正确 (1-12，开始≤结束)');
+                        return;
+                    }
+
+                    const newCourse = { startWeek, endWeek, weekType, weekday, startPeriod, endPeriod };
+                    try {
+                        const res = await fetch('/api/preset_courses', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(newCourse)
+                        });
+                        if (res.ok) {
+                            await loadPresetCourses();
+                            modal.classList.remove('show');
+                        } else {
+                            alert('添加失败');
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // 删除单个课程（事件委托）
+                presetList.addEventListener('click', async (e) => {
+                    const deleteBtn = e.target.closest('.delete-btn');
+                    if (deleteBtn) {
+                        const id = deleteBtn.dataset.id;
+                        if (!confirm('确定删除该预置课程吗？')) return;
+                        try {
+                            const res = await fetch(`/api/preset_courses/${id}`, { method: 'DELETE' });
+                            if (res.ok) {
+                                await loadPresetCourses();
+                            } else {
+                                alert('删除失败');
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    }
+                });
+
+                // 一键清空所有预置课程
+                clearAllBtn.addEventListener('click', async () => {
+                    if (presetCourses.length === 0) {
+                        alert('当前没有预置课程可清空');
+                        return;
+                    }
+                    if (!confirm('确定清空所有预置课程吗？此操作不可恢复！')) return;
+                    try {
+                        const res = await fetch('/api/preset_courses/clear', { method: 'POST' });
+                        if (res.ok) {
+                            await loadPresetCourses();
+                        } else {
+                            alert('清空失败');
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // 初始化加载
+                loadPresetCourses();
+            });
+        })();
+    </script>
+</body>
+</html>

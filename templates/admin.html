@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理后台 · 课程调度</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #0f172a;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .admin-card {
+            max-width: 1300px;
+            width: 100%;
+            background: #f8fafc;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px black;
+            overflow: hidden;
+        }
+        .auth-screen, .admin-screen {
+            padding: 32px 36px;
+        }
+        .auth-screen {
+            background: white;
+        }
+        h2 {
+            font-size: 2rem;
+            color: #0f172a;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 28px;
+            border-left: 8px solid #3b82f6;
+            padding-left: 24px;
+        }
+        .input-group {
+            margin-bottom: 24px;
+        }
+        .input-group label {
+            font-weight: 500;
+            color: #334155;
+            display: block;
+            margin-bottom: 8px;
+        }
+        .input-group input {
+            width: 300px;
+            max-width: 100%;
+            padding: 14px 20px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid #2563eb;
+        }
+        button:hover {
+            background: #2563eb;
+            color: #f1f5f9;
+        }
+        .danger-btn {
+            background: #ef4444;
+            border-color: #b91c1c;
+        }
+        .hidden {
+            display: none;
+        }
+        .toolbar {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px 24px;
+            border-radius: 60px;
+            box-shadow: 0 4px 10px #cbd5e180;
+        }
+        .query-section {
+            background: white;
+            border-radius: 40px;
+            padding: 28px;
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+        }
+        .grid-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 24px;
+            align-items: flex-end;
+            margin-bottom: 24px;
+        }
+        .week-checkbox-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .week-checkbox-group label {
+            background: #f1f5f9;
+            padding: 10px 18px;
+            border-radius: 36px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+        }
+        .period-grid-small {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin: 8px 0;
+        }
+        .period-btn-small {
+            width: 42px;
+            height: 42px;
+            border-radius: 30px;
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            font-weight: 600;
+            color: #334155;
+        }
+        .period-btn-small.selected {
+            background: #bfdbfe;
+            border-color: #2e7bf6;
+        }
+        .query-output {
+            background: #1e293b;
+            color: white;
+            border-radius: 36px;
+            padding: 24px;
+            margin-top: 24px;
+        }
+        .student-list {
+            list-style: none;
+            padding: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .student-list li {
+            background: #3b82f6;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-weight: 500;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px #cbd5e1;
+        }
+        th {
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            padding: 16px 12px;
+            text-align: left;
+        }
+        td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        .name-badge {
+            background: #dbeafe;
+            color: #1e3a8a;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 40px;
+        }
+        .delete-single-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .delete-single-btn:hover {
+            background: #b91c1c;
+        }
+        .delete-all-section {
+            margin-top: 20px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            background: white;
+            padding: 20px 28px;
+            border-radius: 40px;
+        }
+        .delete-all-section input {
+            flex: 1;
+            padding: 12px 20px;
+            border-radius: 40px;
+            border: 1px solid #cbd5e1;
+            font-size: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="admin-card" id="adminRoot">
+        <!-- 权限屏 (密码设置/登录) -->
+        <div id="authPanel" class="auth-screen">
+            <h2>🔐 管理员通道</h2>
+            <div id="firstTimeSetup" class="hidden">
+                <p style="color: #475569;">首次使用，请设置管理密码</p>
+                <div class="input-group">
+                    <label>新密码</label>
+                    <input type="password" id="newPassword" placeholder="输入密码">
+                </div>
+                <button id="setPasswordBtn">设置密码</button>
+            </div>
+            <div id="loginPanel">
+                <div class="input-group">
+                    <label>密码</label>
+                    <input type="password" id="passwordInput" placeholder="输入密码">
+                </div>
+                <button id="loginBtn">进入后台</button>
+            </div>
+        </div>
+
+        <!-- 管理后台主界面 (初始隐藏) -->
+        <div id="adminPanel" class="admin-screen hidden">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>📊 全校课程总览</h2>
+                <div>
+                    <a href="/preset" target="_blank">
+                        <button style="background: #10b981; margin-right: 10px;">📋 管理预置课表</button>
+                    </a>
+                    <button id="logoutBtn" class="danger-btn" style="background:#64748b;">退出登录</button>
+                </div>
+            </div>
+
+            <!-- 查询区域 -->
+            <div class="query-section">
+                <h3 style="margin-top:0;">🔎 查询有课同学 · 指定时间</h3>
+                <div class="grid-row">
+                    <div style="min-width: 160px;">
+                        <label>📌 周数</label>
+                        <input type="number" id="queryWeek" min="1" value="1" style="padding:12px; border-radius:30px; border:1px solid #cbd5e1; width:120px;">
+                    </div>
+                    <div>
+                        <label>📆 星期 (可多选)</label>
+                        <div class="week-checkbox-group" id="queryWeekdays">
+                            <label><input type="checkbox" value="1"> 周一</label>
+                            <label><input type="checkbox" value="2"> 周二</label>
+                            <label><input type="checkbox" value="3"> 周三</label>
+                            <label><input type="checkbox" value="4"> 周四</label>
+                            <label><input type="checkbox" value="5"> 周五</label>
+                            <label><input type="checkbox" value="6"> 周六</label>
+                            <label><input type="checkbox" value="7"> 周日</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="grid-row" style="align-items: center;">
+                    <div style="flex:1;">
+                        <label>⏱️ 节次范围 (网格辅助)</label>
+                        <div class="period-grid-small" id="queryPeriodGrid"></div>
+                        <div style="display: flex; gap: 10px; margin: 12px 0;">
+                            <button id="querySetStartBtn">📌 设为开始</button>
+                            <button id="querySetEndBtn">🎯 设为结束</button>
+                        </div>
+                        <div style="display: flex; gap: 15px;">
+                            <input type="number" id="queryStartPeriod" min="1" max="12" value="1" style="width:90px; padding:12px; border-radius:30px;"> 至
+                            <input type="number" id="queryEndPeriod" min="1" max="12" value="2" style="width:90px; padding:12px; border-radius:30px;">
+                        </div>
+                    </div>
+                    <button id="runQueryBtn" style="height:60px; border-radius:30px; padding:0 36px;">查询</button>
+                </div>
+                <div class="query-output" id="queryResult">
+                    <strong>👥 有课同学：</strong>
+                    <ul class="student-list" id="queryStudentList"></ul>
+                </div>
+            </div>
+
+            <!-- 删除学生所有课程功能区 -->
+            <div class="delete-all-section">
+                <input type="text" id="deleteStudentName" placeholder="输入学生姓名，删除其所有课程">
+                <button id="deleteAllCoursesBtn" style="background:#ef4444; border-color:#b91c1c;">删除该学生所有课程</button>
+            </div>
+
+            <!-- 全部课程列表 -->
+            <table id="allCoursesTable">
+                <thead>
+                    <tr>
+                        <th>姓名</th>
+                        <th>课程详情 (周·单双·星期·节次)</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="coursesTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                // DOM 元素
+                const authPanel = document.getElementById('authPanel');
+                const adminPanel = document.getElementById('adminPanel');
+                const firstTimeDiv = document.getElementById('firstTimeSetup');
+                const loginDiv = document.getElementById('loginPanel');
+                const setPwBtn = document.getElementById('setPasswordBtn');
+                const loginBtn = document.getElementById('loginBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                const newPwInput = document.getElementById('newPassword');
+                const pwInput = document.getElementById('passwordInput');
+                const queryWeek = document.getElementById('queryWeek');
+                const queryStartPeriod = document.getElementById('queryStartPeriod');
+                const queryEndPeriod = document.getElementById('queryEndPeriod');
+                const runQueryBtn = document.getElementById('runQueryBtn');
+                const queryStudentList = document.getElementById('queryStudentList');
+                const coursesTableBody = document.getElementById('coursesTableBody');
+                const queryPeriodGrid = document.getElementById('queryPeriodGrid');
+                const setStartBtn = document.getElementById('querySetStartBtn');
+                const setEndBtn = document.getElementById('querySetEndBtn');
+                const deleteAllBtn = document.getElementById('deleteAllCoursesBtn');
+                const deleteStudentInput = document.getElementById('deleteStudentName');
+
+                // 检查关键元素
+                if (!authPanel || !adminPanel || !firstTimeDiv || !loginDiv) {
+                    console.error('管理员页面关键元素缺失');
+                    return;
+                }
+
+                // 网格辅助
+                let querySelectedPeriod = 1;
+                function buildQueryPeriodGrid() {
+                    if (!queryPeriodGrid) return;
+                    queryPeriodGrid.innerHTML = '';
+                    for (let i = 1; i <= 12; i++) {
+                        const btn = document.createElement('button');
+                        btn.className = 'period-btn-small';
+                        btn.textContent = i;
+                        btn.dataset.period = i;
+                        btn.addEventListener('click', (e) => {
+                            document.querySelectorAll('#queryPeriodGrid .period-btn-small').forEach(b => b.classList.remove('selected'));
+                            e.target.classList.add('selected');
+                            querySelectedPeriod = i;
+                        });
+                        queryPeriodGrid.appendChild(btn);
+                    }
+                    if (queryPeriodGrid.children[0]) queryPeriodGrid.children[0].classList.add('selected');
+                }
+                buildQueryPeriodGrid();
+
+                if (setStartBtn) {
+                    setStartBtn.addEventListener('click', ()=>{
+                        if (queryStartPeriod) queryStartPeriod.value = querySelectedPeriod;
+                    });
+                }
+                if (setEndBtn) {
+                    setEndBtn.addEventListener('click', ()=>{
+                        if (queryEndPeriod) queryEndPeriod.value = querySelectedPeriod;
+                    });
+                }
+
+                // 检查后端是否已设置密码
+                async function checkSetup() {
+                    try {
+                        const res = await fetch('/api/admin/check_setup');
+                        if (!res.ok) throw new Error('网络错误');
+                        const data = await res.json();
+                        if (data.setup_done) {
+                            firstTimeDiv.classList.add('hidden');
+                            loginDiv.classList.remove('hidden');
+                        } else {
+                            firstTimeDiv.classList.remove('hidden');
+                            loginDiv.classList.add('hidden');
+                        }
+                    } catch (e) {
+                        console.error('检查设置失败', e);
+                    }
+                }
+                checkSetup();
+
+                // 设置密码
+                if (setPwBtn) {
+                    setPwBtn.addEventListener('click', async () => {
+                        const pw = newPwInput.value.trim();
+                        if (!pw) { alert('密码不能为空'); return; }
+                        try {
+                            const res = await fetch('/api/admin/setup', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ password: pw })
+                            });
+                            if (res.ok) {
+                                alert('密码设置成功');
+                                await checkSetup();
+                            } else {
+                                const err = await res.json();
+                                alert('设置失败：' + err.error);
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    });
+                }
+
+                // 登录
+                if (loginBtn) {
+                    loginBtn.addEventListener('click', async () => {
+                        const pw = pwInput.value.trim();
+                        try {
+                            const res = await fetch('/api/admin/login', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ password: pw })
+                            });
+                            if (res.ok) {
+                                authPanel.classList.add('hidden');
+                                adminPanel.classList.remove('hidden');
+                                loadAllCourses();
+                            } else {
+                                const err = await res.json();
+                                alert('登录失败：' + (err.error || '密码错误'));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    });
+                }
+
+                // 退出
+                if (logoutBtn) {
+                    logoutBtn.addEventListener('click', async () => {
+                        await fetch('/api/admin/logout', { method: 'POST' });
+                        adminPanel.classList.add('hidden');
+                        authPanel.classList.remove('hidden');
+                        pwInput.value = '';
+                        await checkSetup();
+                    });
+                }
+
+                // 加载所有课程（包含课程ID，用于删除）
+                async function loadAllCourses() {
+                    try {
+                        const res = await fetch('/api/admin/all_courses');
+                        if (res.status === 401) {
+                            alert('登录已过期，请重新登录');
+                            adminPanel.classList.add('hidden');
+                            authPanel.classList.remove('hidden');
+                            return;
+                        }
+                        if (!res.ok) throw new Error('加载失败');
+                        const students = await res.json();
+                        let html = '';
+                        students.forEach(({ name, courses }) => {
+                            if (courses.length === 0) {
+                                html += `<tr><td colspan="3"><span class="name-badge">${name}</span> (无课程)</td></tr>`;
+                            } else {
+                                // 按星期和节次排序
+                                const sortedCourses = [...courses].sort((a, b) => {
+                                    if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+                                    return a.startPeriod - b.startPeriod;
+                                });
+                                sortedCourses.forEach(c => {
+                                    const weekMap = { 'all':'全','odd':'单','even':'双' };
+                                    const wdStr = ['周一','周二','周三','周四','周五','周六','周日'][c.weekday-1] || '?';
+                                    html += `<tr data-course-id="${c.id}">
+                                        <td><span class="name-badge">${name}</span></td>
+                                        <td>第${c.startWeek}-${c.endWeek}周 · ${weekMap[c.weekType]} · ${wdStr} · ${c.startPeriod}-${c.endPeriod}节</td>
+                                        <td style="text-align:center;">
+                                            <button class="delete-single-btn" data-id="${c.id}">删除</button>
+                                        </td>
+                                    </tr>`;
+                                });
+                            }
+                        });
+                        if (students.length === 0) {
+                            html = `<tr><td colspan="3" style="text-align:center; padding:40px;">暂无任何学生课程</td></tr>`;
+                        }
+                        coursesTableBody.innerHTML = html;
+                    } catch (e) {
+                        console.error('加载课程失败', e);
+                    }
+                }
+
+                // 删除单个课程（事件委托）
+                coursesTableBody.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('.delete-single-btn');
+                    if (btn) {
+                        if (!confirm('确定删除该课程吗？')) return;
+                        const courseId = btn.dataset.id;
+                        try {
+                            const res = await fetch(`/api/admin/course/${courseId}`, { method: 'DELETE' });
+                            if (res.ok) {
+                                await loadAllCourses();
+                            } else {
+                                alert('删除失败');
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    }
+                });
+
+                // 删除学生所有课程
+                if (deleteAllBtn) {
+                    deleteAllBtn.addEventListener('click', async () => {
+                        const name = deleteStudentInput.value.trim();
+                        if (!name) {
+                            alert('请输入学生姓名');
+                            return;
+                        }
+                        if (!confirm(`确定删除学生 "${name}" 的所有课程吗？`)) return;
+                        try {
+                            const res = await fetch(`/api/admin/student_courses?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+                            if (res.ok) {
+                                await loadAllCourses();
+                                deleteStudentInput.value = '';
+                            } else {
+                                const err = await res.json();
+                                alert('删除失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    });
+                }
+
+                // 查询
+                if (runQueryBtn) {
+                    runQueryBtn.addEventListener('click', async () => {
+                        const weekNum = parseInt(queryWeek.value);
+                        if (isNaN(weekNum) || weekNum < 1) { alert('周数必须≥1'); return; }
+                        const startP = parseInt(queryStartPeriod.value);
+                        const endP = parseInt(queryEndPeriod.value);
+                        if (startP > endP || startP < 1 || endP > 12) { alert('节次范围无效'); return; }
+                        const checkedWeekdays = [];
+                        document.querySelectorAll('#queryWeekdays input:checked').forEach(cb => {
+                            checkedWeekdays.push(parseInt(cb.value));
+                        });
+                        if (checkedWeekdays.length === 0) { alert('至少选一个星期'); return; }
+
+                        try {
+                            const res = await fetch('/api/admin/query', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    week: weekNum,
+                                    weekdays: checkedWeekdays,
+                                    startPeriod: startP,
+                                    endPeriod: endP
+                                })
+                            });
+                            if (res.status === 401) {
+                                alert('登录已过期，请重新登录');
+                                adminPanel.classList.add('hidden');
+                                authPanel.classList.remove('hidden');
+                                return;
+                            }
+                            const names = await res.json();
+                            if (names.length === 0) {
+                                queryStudentList.innerHTML = '<li style="background:#475569;">😴 无人上课</li>';
+                            } else {
+                                queryStudentList.innerHTML = names.map(n => `<li>${n}</li>`).join('');
+                            }
+                        } catch (e) {
+                            console.error('查询失败', e);
+                        }
+                    });
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
