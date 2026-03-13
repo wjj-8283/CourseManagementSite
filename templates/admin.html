@@ -173,6 +173,13 @@
             padding: 16px 12px;
             text-align: left;
         }
+        .reset-password-section {
+            background: white;
+            border-radius: 40px;
+            padding: 28px;
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+        }
         td {
             padding: 14px 12px;
             border-bottom: 1px solid #e2e8f0;
@@ -186,6 +193,13 @@
             font-weight: 600;
             padding: 4px 12px;
             border-radius: 40px;
+        }
+        .delete-all-section {
+            background: white;
+            border-radius: 40px;
+            padding: 28px;
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
         }
         .delete-single-btn {
             background: #ef4444;
@@ -242,10 +256,13 @@
         <!-- 管理后台主界面 (初始隐藏) -->
         <div id="adminPanel" class="admin-screen hidden">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>📊 全校课程总览</h2>
+                <h2>📊 全班课程总览</h2>
                 <div>
                     <a href="/preset" target="_blank">
                         <button style="background: #10b981; margin-right: 10px;">📋 管理预置课表</button>
+                    </a>
+                    <a href="/backup_restore" target="_blank">
+                        <button style="background: #f59e0b; margin-right: 10px;">💾 备份与还原</button>
                     </a>
                     <button id="logoutBtn" class="danger-btn" style="background:#64748b;">退出登录</button>
                 </div>
@@ -296,9 +313,14 @@
             <!-- 删除学生所有课程功能区 -->
             <div class="delete-all-section">
                 <input type="text" id="deleteStudentName" placeholder="输入学生姓名，删除其所有课程">
+                <button id="deleteAllBtn" style="background:#ef4444; border-color:#b91c1c;">删除该学生</button>
                 <button id="deleteAllCoursesBtn" style="background:#ef4444; border-color:#b91c1c;">删除该学生所有课程</button>
             </div>
-
+            <!-- 重置密码功能 -->
+            <div class="reset-password-section" style="margin-top: 20px; display: flex; gap: 16px; align-items: center; background: white; padding: 20px 28px; border-radius: 40px;">
+                <input type="text" id="resetPasswordStudentName" placeholder="输入学生姓名，重置其密码" style="flex:1; padding:12px 20px; border-radius:40px; font-size: 1rem; border:1px solid #cbd5e1;">
+                <button id="resetPasswordBtn" style="background: #f59e0b; border-color:#d97706;">重置密码</button>
+            </div>
             <!-- 全部课程列表 -->
             <table id="allCoursesTable">
                 <thead>
@@ -335,8 +357,11 @@
                 const queryPeriodGrid = document.getElementById('queryPeriodGrid');
                 const setStartBtn = document.getElementById('querySetStartBtn');
                 const setEndBtn = document.getElementById('querySetEndBtn');
-                const deleteAllBtn = document.getElementById('deleteAllCoursesBtn');
+                const deleteAllBtn = document.getElementById('deleteAllBtn');
+                const deleteAllCoursesBtn = document.getElementById('deleteAllCoursesBtn');
                 const deleteStudentInput = document.getElementById('deleteStudentName');
+                const resetPasswordBtn = document.getElementById('resetPasswordBtn');
+                const resetPasswordInput = document.getElementById('resetPasswordStudentName');
 
                 // 检查关键元素
                 if (!authPanel || !adminPanel || !firstTimeDiv || !loginDiv) {
@@ -517,7 +542,7 @@
                     }
                 });
 
-                // 删除学生所有课程
+                // 删除学生
                 if (deleteAllBtn) {
                     deleteAllBtn.addEventListener('click', async () => {
                         const name = deleteStudentInput.value.trim();
@@ -525,9 +550,9 @@
                             alert('请输入学生姓名');
                             return;
                         }
-                        if (!confirm(`确定删除学生 "${name}" 的所有课程吗？`)) return;
+                        if (!confirm(`确定删除学生 "${name}" 吗？`)) return;
                         try {
-                            const res = await fetch(`/api/admin/student_courses?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+                            const res = await fetch(`/api/admin/student?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
                             if (res.ok) {
                                 await loadAllCourses();
                                 deleteStudentInput.value = '';
@@ -540,7 +565,55 @@
                         }
                     });
                 }
-
+                // 删除学生所有课程
+                if (deleteAllCoursesBtn) {
+                    deleteAllCoursesBtn.addEventListener('click', async () => {
+                        const name = deleteStudentInput.value.trim();
+                        if (!name) {
+                            alert('请输入学生姓名');
+                            return;
+                        }
+                        if (!confirm(`确定删除学生 "${name}" 的所有课程吗？`)) return;
+                        try {
+                            const res = await fetch(`/api/admin/student2?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+                            if (res.ok) {
+                                await loadAllCourses();
+                                deleteStudentInput.value = '';
+                            } else {
+                                const err = await res.json();
+                                alert('删除失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    });
+                }
+                if (resetPasswordBtn) {
+                    resetPasswordBtn.addEventListener('click', async () => {
+                        const name = resetPasswordInput.value.trim();
+                        if (!name) {
+                            alert('请输入学生姓名');
+                            return;
+                        }
+                        if (!confirm(`确定重置学生 "${name}" 的密码吗？这将允许该学生重新设置密码。`)) return;
+                        try {
+                            const res = await fetch('/api/admin/reset_password', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ name })
+                            });
+                            if (res.ok) {
+                                alert('密码重置成功');
+                                resetPasswordInput.value = '';
+                            } else {
+                                const err = await res.json();
+                                alert('重置失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    });
+                }
                 // 查询
                 if (runQueryBtn) {
                     runQueryBtn.addEventListener('click', async () => {
