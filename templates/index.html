@@ -42,7 +42,7 @@
             background: #f8fafc;
             padding: 16px 20px;
             border-radius: 40px;
-            margin-bottom: 28px;
+            margin-bottom: 16px;
             border: 1px solid #e2e8f0;
         }
         .name-bar input {
@@ -73,6 +73,30 @@
         }
         .name-bar button:hover {
             background: #2563eb;
+        }
+        .auth-status {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0 10px 16px 10px;
+            color: #475569;
+            font-size: 0.95rem;
+            border-bottom: 1px dashed #cbd5e1;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .auth-status button {
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        .auth-status button:hover {
+            background: #e2e8f0;
         }
         .list-header {
             display: flex;
@@ -160,7 +184,6 @@
             background: #fee2e2;
             border-color: #ef4444;
         }
-        /* 模态框 */
         .modal {
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -252,8 +275,8 @@
             cursor: pointer;
             transition: 0.1s;
         }
-        .period-btn:hover {
-            background: #dbeafe;
+        .period-btn.selected {
+            background: #bfdbfe;
             border-color: #3b82f6;
         }
         .period-actions {
@@ -270,9 +293,8 @@
             cursor: pointer;
             transition: 0.1s;
         }
-        .period-actions button.active {
-            background: #3b82f6;
-            color: white;
+        .period-actions button:hover {
+            background: #cbd5e1;
         }
         .modal-actions {
             display: flex;
@@ -309,6 +331,14 @@
         <div class="name-bar">
             <input type="text" id="studentName" placeholder="输入你的姓名" autocomplete="off">
             <button id="loadCoursesBtn">加载 / 刷新</button>
+        </div>
+
+        <!-- 密码状态区域 -->
+        <div class="auth-status" id="authStatus" style="display: none;">
+            <span id="authMessage"></span>
+            <button id="authActionBtn"></button>
+            <button id="logoutBtn" style="display: none;">退出</button>
+            <button id="changePasswordBtn" style="display: none;">修改密码</button>
         </div>
 
         <div class="list-header">
@@ -354,9 +384,7 @@
             </div>
             <div class="field-row">
                 <label>⏰ 节次范围 (网格辅助)</label>
-                <div class="period-grid" id="periodGrid">
-                    <!-- 由JS生成1~12按钮 -->
-                </div>
+                <div class="period-grid" id="periodGrid"></div>
                 <div class="period-actions">
                     <button id="setStartPeriodBtn">⚡设为开始节次</button>
                     <button id="setEndPeriodBtn">🎯设为结束节次</button>
@@ -375,27 +403,57 @@
         </div>
     </div>
 
+    <!-- 密码设置/登录/修改密码模态框 -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="passwordModalTitle">设置密码</h3>
+            <div class="field-row" id="oldPasswordRow" style="display: none;">
+                <label>旧密码</label>
+                <input type="password" id="oldPasswordInput" placeholder="输入旧密码">
+            </div>
+            <div class="field-row">
+                <label id="passwordLabel">新密码</label>
+                <input type="password" id="passwordInput1" placeholder="输入密码">
+            </div>
+            <div class="modal-actions">
+                <button class="cancel" id="closePasswordModalBtn">取消</button>
+                <button class="confirm" id="confirmPasswordBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         (function() {
-            // 确保DOM加载完成后执行
             document.addEventListener('DOMContentLoaded', function() {
                 // ---------- 状态 ----------
                 let currentName = '';
                 let courses = [];
-
-                // 弹窗内辅助变量
-                let selectedPeriod = 1;
+                let hasPassword = false;
+                let authenticated = false;
 
                 // DOM 元素
                 const nameInput = document.getElementById('studentName');
                 const loadBtn = document.getElementById('loadCoursesBtn');
                 const courseListEl = document.getElementById('courseListContainer');
                 const openModalBtn = document.getElementById('openAddModalBtn');
-                const modal = document.getElementById('courseModal');
+                const courseModal = document.getElementById('courseModal');
                 const closeModalBtn = document.getElementById('closeModalBtn');
                 const saveCourseBtn = document.getElementById('saveCourseBtn');
+                const passwordModal = document.getElementById('passwordModal');
+                const passwordModalTitle = document.getElementById('passwordModalTitle');
+                const passwordLabel = document.getElementById('passwordLabel');
+                const passwordInput1 = document.getElementById('passwordInput1');
+                const oldPasswordInput = document.getElementById('oldPasswordInput');
+                const oldPasswordRow = document.getElementById('oldPasswordRow');
+                const confirmPasswordBtn = document.getElementById('confirmPasswordBtn');
+                const closePasswordModalBtn = document.getElementById('closePasswordModalBtn');
+                const authStatusDiv = document.getElementById('authStatus');
+                const authMessageSpan = document.getElementById('authMessage');
+                const authActionBtn = document.getElementById('authActionBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                const changePasswordBtn = document.getElementById('changePasswordBtn');
 
-                // 弹窗输入项
+                // 课程模态框内元素
                 const startWeekInp = document.getElementById('startWeek');
                 const endWeekInp = document.getElementById('endWeek');
                 const weekTypeRadios = document.getElementsByName('weekType');
@@ -406,13 +464,9 @@
                 const setStartBtn = document.getElementById('setStartPeriodBtn');
                 const setEndBtn = document.getElementById('setEndPeriodBtn');
 
-                // 检查关键元素是否存在
-                if (!courseListEl || !loadBtn || !openModalBtn || !modal) {
-                    console.error('关键DOM元素未找到，请检查ID');
-                    return;
-                }
+                let selectedPeriod = 1;
 
-                // ---------- 初始化节次网格 (1~12) ----------
+                // ---------- 初始化节次网格 ----------
                 function buildPeriodGrid() {
                     if (!periodGrid) return;
                     periodGrid.innerHTML = '';
@@ -422,18 +476,16 @@
                         btn.textContent = i;
                         btn.dataset.period = i;
                         btn.addEventListener('click', (e) => {
-                            document.querySelectorAll('.period-btn').forEach(b => b.style.background = '#f1f5f9');
-                            e.target.style.background = '#bfdbfe';
+                            document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+                            e.target.classList.add('selected');
                             selectedPeriod = i;
                         });
                         periodGrid.appendChild(btn);
                     }
-                    // 默认高亮1
-                    if (periodGrid.children[0]) periodGrid.children[0].style.background = '#bfdbfe';
+                    if (periodGrid.children[0]) periodGrid.children[0].classList.add('selected');
                 }
                 buildPeriodGrid();
 
-                // 设置开始节次
                 if (setStartBtn) {
                     setStartBtn.addEventListener('click', () => {
                         startPeriodInp.value = selectedPeriod;
@@ -458,14 +510,17 @@
                     }
                 });
 
-                // ---------- 从后端加载课程 ----------
+                // ---------- 加载课程 ----------
                 async function fetchCourses(name) {
                     if (!name.trim()) return false;
                     try {
                         const response = await fetch(`/api/courses?student=${encodeURIComponent(name)}`);
                         if (!response.ok) throw new Error('加载失败');
-                        courses = await response.json();
+                        const data = await response.json();
+                        courses = data.courses;
+                        hasPassword = data.has_password;
                         currentName = name.trim();
+                        await checkAuthStatus();
                         renderCourseList();
                         return true;
                     } catch (e) {
@@ -474,28 +529,162 @@
                     }
                 }
 
-                // 保存当前课程到后端
-                async function saveCurrentCourses() {
+                // ---------- 检查认证状态 ----------
+                async function checkAuthStatus() {
                     if (!currentName) return;
                     try {
-                        await fetch('/api/courses', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ student: currentName, courses: courses })
-                        });
+                        const res = await fetch(`/api/student/check_auth?name=${encodeURIComponent(currentName)}`);
+                        const data = await res.json();
+                        authenticated = data.authenticated;
+                        updateAuthUI();
                     } catch (e) {
-                        alert('保存失败：' + e.message);
+                        console.error('检查认证失败', e);
                     }
                 }
 
-                // 渲染课程列表
+                function updateAuthUI() {
+                    if (!currentName) {
+                        authStatusDiv.style.display = 'none';
+                        return;
+                    }
+                    authStatusDiv.style.display = 'flex';
+                    if (authenticated) {
+                        authMessageSpan.textContent = `✅ 已认证 (${currentName})`;
+                        authActionBtn.style.display = 'none';
+                        logoutBtn.style.display = 'inline-block';
+                        changePasswordBtn.style.display = 'inline-block';
+                    } else {
+                        if (hasPassword) {
+                            authMessageSpan.textContent = `🔒 需要密码 (${currentName})`;
+                            authActionBtn.textContent = '登录';
+                        } else {
+                            authMessageSpan.textContent = `⚠️ 未设置密码 (${currentName})`;
+                            authActionBtn.textContent = '设置密码';
+                        }
+                        authActionBtn.style.display = 'inline-block';
+                        logoutBtn.style.display = 'none';
+                        changePasswordBtn.style.display = 'none';
+                    }
+                }
+
+                // ---------- 登出 ----------
+                logoutBtn.addEventListener('click', async () => {
+                    await fetch('/api/student/logout', { method: 'POST' });
+                    authenticated = false;
+                    updateAuthUI();
+                    renderCourseList();
+                });
+
+                // ---------- 打开密码模态框 ----------
+                authActionBtn.addEventListener('click', () => {
+                    if (!currentName) return;
+                    if (hasPassword) {
+                        openPasswordModal('login');
+                    } else {
+                        openPasswordModal('set');
+                    }
+                });
+
+                changePasswordBtn.addEventListener('click', () => {
+                    if (!currentName) return;
+                    openPasswordModal('change');
+                });
+
+                function openPasswordModal(mode) {  // mode: 'login', 'set', 'change'
+                    passwordInput1.value = '';
+                    oldPasswordInput.value = '';
+                    if (mode === 'login') {
+                        passwordModalTitle.textContent = '登录';
+                        passwordLabel.textContent = '密码';
+                        oldPasswordRow.style.display = 'none';
+                    } else if (mode === 'set') {
+                        passwordModalTitle.textContent = '设置密码';
+                        passwordLabel.textContent = '新密码';
+                        oldPasswordRow.style.display = hasPassword ? 'flex' : 'none';
+                    } else if (mode === 'change') {
+                        passwordModalTitle.textContent = '修改密码';
+                        passwordLabel.textContent = '新密码';
+                        oldPasswordRow.style.display = '';
+                    }
+                    passwordModal.classList.add('show');
+                }
+
+                closePasswordModalBtn.addEventListener('click', () => {
+                    passwordModal.classList.remove('show');
+                });
+                passwordModal.addEventListener('click', (e) => {
+                    if (e.target === passwordModal) passwordModal.classList.remove('show');
+                });
+
+                confirmPasswordBtn.addEventListener('click', async () => {
+                    const password = passwordInput1.value.trim();
+                    if (!password) {
+                        alert('请输入密码');
+                        return;
+                    }
+                    const isLogin = passwordModalTitle.textContent === '登录';
+                    const isChange = passwordModalTitle.textContent === '修改密码';
+                    let url, body;
+                    if (isLogin) {
+                        url = '/api/student/login';
+                        body = { name: currentName, password };
+                    } else {
+                        url = '/api/student/set_password';
+                        body = { name: currentName, new_password: password };
+                        if (hasPassword || isChange) {
+                            const oldPw = oldPasswordInput.value.trim();
+                            if (!oldPw) {
+                                alert('请输入旧密码');
+                                return;
+                            }
+                            body.old_password = oldPw;
+                        }
+                    }
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        if (res.ok) {
+                            alert(isLogin ? '登录成功' : '密码设置成功');
+                            passwordModal.classList.remove('show');
+                            // 如果是设置密码或修改密码，hasPassword 应变为 true
+                            if (!isLogin) {
+                                hasPassword = true;
+                            }
+                            await checkAuthStatus();
+                            renderCourseList();
+                        } else {
+                            const err = await res.json();
+                            alert('操作失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // ---------- 渲染课程列表（排序 + 删除按钮控制 + 空课程加载按钮） ----------
                 function renderCourseList() {
                     if (!courseListEl) return;
                     if (!courses || courses.length === 0) {
-                        courseListEl.innerHTML = `<li style="padding: 32px; text-align: center; color: #64748b;">📭 暂无课程，点击右上角添加</li>`;
+                        let emptyHtml = `<li style="padding: 32px; text-align: center; color: #64748b;">📭 暂无课程`;
+                        if (authenticated) {
+                            emptyHtml += `<br><button id="loadPresetBtn" style="margin-top:16px; background:#3b82f6; color:white; border:none; padding:8px 24px; border-radius:40px; cursor:pointer;">📋 加载预置课程</button>`;
+                        } else {
+                            emptyHtml += `，请登录后添加`;
+                        }
+                        emptyHtml += `</li>`;
+                        courseListEl.innerHTML = emptyHtml;
+
+                        const loadPresetBtn = document.getElementById('loadPresetBtn');
+                        if (loadPresetBtn) {
+                            loadPresetBtn.addEventListener('click', loadPresetCourses);
+                        }
                         return;
                     }
-                    // 获取排序后的原始索引顺序
+
+                    // 按星期和节次排序
                     const sortedIndices = courses
                         .map((_, idx) => idx)
                         .sort((i, j) => {
@@ -516,17 +705,39 @@
                                 <span class="badge">${weekTypeMap[c.weekType]}</span>
                                 <span class="badge">${wd}</span>
                                 <span class="badge">第${c.startPeriod}-${c.endPeriod}节</span>
-                            </div>
-                            <button class="delete-btn" data-index="${originalIndex}">✕</button>
-                        </li>`;
+                            </div>`;
+                        if (authenticated) {
+                            html += `<button class="delete-btn" data-index="${originalIndex}">✕</button>`;
+                        } else {
+                            html += `<span style="width:36px;"></span>`;
+                        }
+                        html += `</li>`;
                     });
                     courseListEl.innerHTML = html;
                 }
 
-                // 使用事件委托处理删除
+                // ---------- 保存课程到后端 ----------
+                async function saveCurrentCourses() {
+                    if (!currentName) return;
+                    try {
+                        await fetch('/api/courses', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ student: currentName, courses: courses })
+                        });
+                    } catch (e) {
+                        alert('保存失败：' + e.message);
+                    }
+                }
+
+                // ---------- 删除事件委托 ----------
                 courseListEl.addEventListener('click', async (e) => {
                     const deleteBtn = e.target.closest('.delete-btn');
                     if (deleteBtn) {
+                        if (!authenticated) {
+                            alert('请先登录后再删除课程');
+                            return;
+                        }
                         const idx = deleteBtn.dataset.index;
                         if (idx !== undefined) {
                             courses.splice(idx, 1);
@@ -536,7 +747,34 @@
                     }
                 });
 
-                // 加载按钮点击
+                // ---------- 加载预置课程 ----------
+                async function loadPresetCourses() {
+                    if (!currentName || !authenticated) return;
+                    if (!confirm('确定加载预置课程吗？这将添加当前所有预置课程到你的课表中。')) return;
+                    try {
+                        const res = await fetch('/api/student/load_preset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: currentName })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.count === 0) {
+                                alert('当前没有预置课程可加载');
+                            } else {
+                                alert(`预置课程加载成功，共 ${data.count} 门`);
+                                await fetchCourses(currentName);
+                            }
+                        } else {
+                            const err = await res.json();
+                            alert('加载失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                }
+
+                // ---------- 加载按钮 ----------
                 loadBtn.addEventListener('click', async () => {
                     const name = nameInput.value.trim();
                     if (name) {
@@ -546,42 +784,39 @@
                     }
                 });
 
-                // 打开模态框
+                // ---------- 打开添加课程模态框 ----------
                 openModalBtn.addEventListener('click', () => {
                     if (!currentName) {
                         alert('请先加载姓名');
                         return;
                     }
-                    // 重置弹窗为默认值
-                    if (startWeekInp) startWeekInp.value = 1;
-                    if (endWeekInp) endWeekInp.value = 16;
-                    const allRadio = document.querySelector('input[name="weekType"][value="all"]');
-                    if (allRadio) allRadio.checked = true;
-                    const mondayRadio = document.querySelector('input[name="weekday"][value="1"]');
-                    if (mondayRadio) mondayRadio.checked = true;
-                    if (startPeriodInp) startPeriodInp.value = 1;
-                    if (endPeriodInp) endPeriodInp.value = 2;
-                    // 重置网格高亮
-                    document.querySelectorAll('.period-btn').forEach(b => b.style.background = '#f1f5f9');
-                    if (periodGrid && periodGrid.children[0]) periodGrid.children[0].style.background = '#bfdbfe';
-                    selectedPeriod = 1;
-                    modal.classList.add('show');
-                });
-
-                if (closeModalBtn) {
-                    closeModalBtn.addEventListener('click', () => {
-                        modal.classList.remove('show');
-                    });
-                }
-
-                // 保存课程
-                saveCourseBtn.addEventListener('click', async () => {
-                    if (!currentName) {
-                        alert('姓名失效，请重新加载');
-                        modal.classList.remove('show');
+                    if (!authenticated) {
+                        alert('请先登录后再添加课程');
                         return;
                     }
-                    // 取值
+                    // 重置表单
+                    startWeekInp.value = 1;
+                    endWeekInp.value = 16;
+                    document.querySelector('input[name="weekType"][value="all"]').checked = true;
+                    document.querySelector('input[name="weekday"][value="1"]').checked = true;
+                    startPeriodInp.value = 1;
+                    endPeriodInp.value = 2;
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('selected'));
+                    if (periodGrid.children[0]) periodGrid.children[0].classList.add('selected');
+                    selectedPeriod = 1;
+                    courseModal.classList.add('show');
+                });
+
+                // 关闭课程模态框
+                closeModalBtn.addEventListener('click', () => {
+                    courseModal.classList.remove('show');
+                });
+                courseModal.addEventListener('click', (e) => {
+                    if (e.target === courseModal) courseModal.classList.remove('show');
+                });
+
+                // 保存课程按钮
+                saveCourseBtn.addEventListener('click', async () => {
                     const startWeek = parseInt(startWeekInp.value);
                     const endWeek = parseInt(endWeekInp.value);
                     if (startWeek > endWeek || startWeek < 1) {
@@ -603,12 +838,7 @@
                     courses.push(newCourse);
                     await saveCurrentCourses();
                     renderCourseList();
-                    modal.classList.remove('show');
-                });
-
-                // 点击模态背景关闭
-                modal.addEventListener('click', (e) => {
-                    if (e.target === modal) modal.classList.remove('show');
+                    courseModal.classList.remove('show');
                 });
             });
         })();
