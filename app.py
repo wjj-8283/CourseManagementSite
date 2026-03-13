@@ -64,6 +64,21 @@ def init_db():
                   weekday INTEGER NOT NULL,
                   start_period INTEGER NOT NULL,
                   end_period INTEGER NOT NULL)''')
+    # 白名单设置表（存储开关状态）
+    c.execute('''CREATE TABLE IF NOT EXISTS whitelist_settings
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                enabled INTEGER DEFAULT 0)''')  # 0=禁用, 1=启用
+
+    # 白名单人员表
+    c.execute('''CREATE TABLE IF NOT EXISTS whitelist
+                (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+
+    # 确保 whitelist_settings 表中有一条记录
+    c.execute('SELECT COUNT(*) FROM whitelist_settings')
+    if c.fetchone()[0] == 0:
+        c.execute('INSERT INTO whitelist_settings (enabled) VALUES (0)')
     conn.commit()
     conn.close()
 
@@ -86,6 +101,14 @@ def admin_page():
 def preset_page():
     return render_template('preset.html')
 
+@app.route('/whitelist')
+def whitelist_page():
+    return render_template('whitelist.html')
+
+@app.route('/backup_restore')
+def backup_restore():
+    return render_template('backup_restore.html')
+
 # ---------- API：对外访问 ----------
 @app.route('/api/courses', methods=['GET'])
 def get_courses():
@@ -95,37 +118,55 @@ def get_courses():
 
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    c.execute('SELECT password_hash FROM students WHERE student_name = ?', (student,))
-    row = c.fetchone()
-    if row is None:
-        # 首次使用：创建学生记录（无密码），并插入预置课程
-        c.execute('INSERT INTO students (student_name) VALUES (?)', (student,))
-        c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM preset_courses')
-        preset_rows = c.fetchall()
-        for pr in preset_rows:
-            c.execute('''INSERT INTO courses 
-                         (student_name, start_week, end_week, week_type, weekday, start_period, end_period)
-                         VALUES (?,?,?,?,?,?,?)''',
-                      (student, pr[0], pr[1], pr[2], pr[3], pr[4], pr[5]))
-        conn.commit()
-        has_password = False
-        courses = [{
-            'startWeek': pr[0], 'endWeek': pr[1], 'weekType': pr[2],
-            'weekday': pr[3], 'startPeriod': pr[4], 'endPeriod': pr[5]
-        } for pr in preset_rows]
-    else:
-        has_password = row[0] is not None
-        # 获取该学生的课程
-        c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM courses WHERE student_name=?', (student,))
-        rows = c.fetchall()
-        courses = [{
-            'startWeek': r[0], 'endWeek': r[1], 'weekType': r[2],
-            'weekday': r[3], 'startPeriod': r[4], 'endPeriod': r[5]
-        } for r in rows]
-    conn.close()
-    return jsonify({'courses': courses, 'has_password': has_password})
 
+    try:
+        # 1. 检查白名单是否启用
+        c.execute('SELECT enabled FROM whitelist_settings LIMIT 1')
+        whitelist_row = c.fetchone()
+        whitelist_enabled = whitelist_row and whitelist_row[0] == 1
 
+        if whitelist_enabled:
+            c.execute('SELECT 1 FROM whitelist WHERE name = ?', (student,))
+            if not c.fetchone():
+                conn.close()
+                return jsonify({'error': 'Access denied: your name is not in the whitelist'}), 403
+
+        # 2. 检查学生是否存在
+        c.execute('SELECT password_hash FROM students WHERE student_name = ?', (student,))
+        student_row = c.fetchone()
+
+        if student_row is None:
+            # 首次使用：创建学生记录（无密码），并插入预置课程
+            c.execute('INSERT INTO students (student_name) VALUES (?)', (student,))
+            c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM preset_courses')
+            preset_rows = c.fetchall()
+            for pr in preset_rows:
+                c.execute('''INSERT INTO courses 
+                             (student_name, start_week, end_week, week_type, weekday, start_period, end_period)
+                             VALUES (?,?,?,?,?,?,?)''',
+                          (student, pr[0], pr[1], pr[2], pr[3], pr[4], pr[5]))
+            conn.commit()
+            has_password = False
+            courses = [{
+                'startWeek': pr[0], 'endWeek': pr[1], 'weekType': pr[2],
+                'weekday': pr[3], 'startPeriod': pr[4], 'endPeriod': pr[5]
+            } for pr in preset_rows]
+        else:
+            has_password = student_row[0] is not None
+            # 获取该学生的课程
+            c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM courses WHERE student_name=?', (student,))
+            rows = c.fetchall()
+            courses = [{
+                'startWeek': r[0], 'endWeek': r[1], 'weekType': r[2],
+                'weekday': r[3], 'startPeriod': r[4], 'endPeriod': r[5]
+            } for r in rows]
+
+        conn.close()
+        return jsonify({'courses': courses, 'has_password': has_password})
+
+    except Exception as e:
+        conn.close()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/courses', methods=['POST'])
 def save_courses():
@@ -407,10 +448,6 @@ def clear_preset_courses():
     conn.close()
     return jsonify({'status': 'ok'})
 
-# ---------- 页面路由：备份还原 ----------
-@app.route('/backup_restore')
-def backup_restore():
-    return render_template('backup_restore.html')
 # ---------- API：数据库备份与还原 ----------
 @app.route('/api/backup/list', methods=['GET'])
 def list_backups():
@@ -556,6 +593,80 @@ def admin_reset_password():
         return jsonify({'error': 'Student not found'}), 404
     # 将密码哈希置为NULL
     c.execute('UPDATE students SET password_hash = NULL WHERE student_name = ?', (student_name,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+# ---------- API：白名单管理 ----------
+@app.route('/api/whitelist/status', methods=['GET'])
+def get_whitelist_status():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('SELECT enabled FROM whitelist_settings LIMIT 1')
+    row = c.fetchone()
+    conn.close()
+    return jsonify({'enabled': bool(row[0]) if row else False})
+
+@app.route('/api/whitelist/status', methods=['POST'])
+def set_whitelist_status():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    enabled = data.get('enabled')
+    if enabled is None:
+        return jsonify({'error': 'Missing enabled'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('UPDATE whitelist_settings SET enabled = ?', (1 if enabled else 0,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/whitelist/list', methods=['GET'])
+def get_whitelist():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('SELECT name, created_at FROM whitelist ORDER BY created_at DESC')
+    rows = c.fetchall()
+    conn.close()
+    return jsonify([{'name': r[0], 'created_at': r[1]} for r in rows])
+
+@app.route('/api/whitelist/add', methods=['POST'])
+def add_to_whitelist():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    names = data.get('names', [])
+    if not names:
+        return jsonify({'error': 'Missing names'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    added = []
+    for name in names:
+        try:
+            c.execute('INSERT OR IGNORE INTO whitelist (name) VALUES (?)', (name,))
+            if c.rowcount > 0:
+                added.append(name)
+        except Exception as e:
+            pass
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok', 'added': added})
+
+@app.route('/api/whitelist/remove', methods=['DELETE'])
+def remove_from_whitelist():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    name = request.args.get('name')
+    if not name:
+        return jsonify({'error': 'Missing name'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM whitelist WHERE name = ?', (name,))
     conn.commit()
     conn.close()
     return jsonify({'status': 'ok'})

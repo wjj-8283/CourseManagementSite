@@ -426,6 +426,11 @@
                     if (!name.trim()) return false;
                     try {
                         const response = await fetch(`/api/courses?student=${encodeURIComponent(name)}`);
+                        if (response.status === 403) {
+                            const err = await response.json();
+                            alert('访问被拒绝：' + (err.error || '你的姓名不在白名单中'));
+                            return false;
+                        }
                         if (!response.ok) throw new Error('加载失败');
                         const data = await response.json();
                         courses = data.courses;
@@ -580,7 +585,7 @@
                         if (authenticated) {
                             emptyHtml += `<br><button id="loadPresetBtn" style="margin-top:12px; background:#3b82f6; color:white; border:none; padding:8px 24px; border-radius:40px;">📋 加载预置课程</button>`;
                         } else {
-                            emptyHtml += `，请登录后添加`;
+                            emptyHtml += `，请登录或者设置密码后添加`;
                         }
                         emptyHtml += `</li>`;
                         courseListEl.innerHTML = emptyHtml;
@@ -643,7 +648,7 @@
                     const deleteBtn = e.target.closest('.delete-btn');
                     if (deleteBtn) {
                         if (!authenticated) {
-                            alert('请先登录后再删除课程');
+                            alert('请先登录或者设置密码后再删除课程');
                             return;
                         }
                         const idx = deleteBtn.dataset.index;
@@ -699,7 +704,7 @@
                         return;
                     }
                     if (!authenticated) {
-                        alert('请先登录后再添加课程');
+                        alert('请先登录或者设置密码后再添加课程');
                         return;
                     }
                     // 重置表单

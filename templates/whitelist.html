@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>白名单管理 · 课程系统</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #0f172a;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .whitelist-card {
+            max-width: 800px;
+            width: 100%;
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px black;
+            padding: 32px 36px;
+        }
+        h2 {
+            font-size: 2rem;
+            color: #0f172a;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 28px;
+            border-left: 8px solid #3b82f6;
+            padding-left: 24px;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .back-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .toggle-section {
+            background: #f8fafc;
+            border-radius: 30px;
+            padding: 24px;
+            margin-bottom: 30px;
+            border: 1px solid #e2e8f0;
+        }
+        .toggle-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .toggle-title {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #0f172a;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 60px;
+            height: 34px;
+        }
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #cbd5e1;
+            transition: .2s;
+            border-radius: 34px;
+        }
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .2s;
+            border-radius: 50%;
+        }
+        input:checked + .slider {
+            background-color: #3b82f6;
+        }
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+        .status-badge {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+        .status-enabled {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-disabled {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        .add-section {
+            display: flex;
+            gap: 12px;
+            margin: 24px 0;
+            flex-wrap: wrap;
+        }
+        .add-section input {
+            flex: 1;
+            min-width: 200px;
+            padding: 14px 20px;
+            border: 1px solid #cbd5e1;
+            border-radius: 40px;
+            font-size: 1rem;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 28px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid #2563eb;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .danger-btn {
+            background: #ef4444;
+            border-color: #b91c1c;
+        }
+        .danger-btn:hover {
+            background: #b91c1c;
+        }
+        .whitelist-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px #cbd5e1;
+            margin-top: 20px;
+        }
+        .whitelist-table th {
+            background: #3b82f6;
+            color: white;
+            font-weight: 600;
+            padding: 16px 12px;
+            text-align: left;
+        }
+        .whitelist-table td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .whitelist-table tr:last-child td {
+            border-bottom: none;
+        }
+        .remove-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            border-radius: 30px;
+            padding: 6px 16px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+        .remove-btn:hover {
+            background: #b91c1c;
+        }
+        .empty-message {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="whitelist-card">
+        <div class="back-link">
+            <a href="/admin">← 返回管理后台</a>
+        </div>
+        <h2>📋 白名单管理</h2>
+
+        <!-- 启用/禁用开关 -->
+        <div class="toggle-section">
+            <div class="toggle-header">
+                <span class="toggle-title">⚙️ 白名单功能</span>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <span id="whitelistStatus" class="status-badge status-disabled">已禁用</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="whitelistToggle">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <p style="color: #475569; margin-top: 16px; margin-bottom: 0;">
+                开启后，只有白名单内的用户才能访问课程系统。白名单外的姓名在加载时会提示无权限。
+            </p>
+        </div>
+
+        <!-- 添加白名单人员 -->
+        <div class="add-section">
+            <input type="text" id="newWhitelistName" placeholder="输入姓名，多个姓名用英文逗号分隔">
+            <button id="addWhitelistBtn">➕ 添加到白名单</button>
+        </div>
+
+        <!-- 白名单列表 -->
+        <table class="whitelist-table">
+            <thead>
+                <tr>
+                    <th>姓名</th>
+                    <th>添加时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="whitelistTableBody">
+                <tr><td colspan="3" class="loading">加载中...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                // DOM 元素
+                const toggleCheckbox = document.getElementById('whitelistToggle');
+                const whitelistStatus = document.getElementById('whitelistStatus');
+                const addBtn = document.getElementById('addWhitelistBtn');
+                const newNameInput = document.getElementById('newWhitelistName');
+                const tableBody = document.getElementById('whitelistTableBody');
+
+                // 检查管理员登录状态
+                async function checkAuth() {
+                    try {
+                        const res = await fetch('/api/admin/check_setup');
+                        if (res.ok) {
+                            const authRes = await fetch('/api/whitelist/list');
+                            if (authRes.status === 401) {
+                                window.location.href = '/admin';
+                            }
+                        } else {
+                            window.location.href = '/admin';
+                        }
+                    } catch (e) {
+                        window.location.href = '/admin';
+                    }
+                }
+                checkAuth();
+
+                // 加载白名单状态和列表
+                async function loadWhitelistStatus() {
+                    try {
+                        const res = await fetch('/api/whitelist/status');
+                        const data = await res.json();
+                        toggleCheckbox.checked = data.enabled;
+                        updateStatusUI(data.enabled);
+                    } catch (e) {
+                        console.error('加载状态失败', e);
+                    }
+                }
+
+                async function loadWhitelist() {
+                    try {
+                        const res = await fetch('/api/whitelist/list');
+                        if (res.status === 401) {
+                            window.location.href = '/admin';
+                            return;
+                        }
+                        const data = await res.json();
+                        renderWhitelist(data);
+                    } catch (e) {
+                        tableBody.innerHTML = `<tr><td colspan="3" class="empty-message">加载失败</td></tr>`;
+                    }
+                }
+
+                function renderWhitelist(names) {
+                    if (!names || names.length === 0) {
+                        tableBody.innerHTML = `<tr><td colspan="3" class="empty-message">暂无白名单人员</td></tr>`;
+                        return;
+                    }
+                    let html = '';
+                    names.forEach((item, index) => {
+                        const date = item.created_at ? new Date(item.created_at).toLocaleString() : '未知';
+                        html += `<tr>
+                            <td>${item.name}</td>
+                            <td>${date}</td>
+                            <td><button class="remove-btn" data-name="${item.name}">移除</button></td>
+                        </tr>`;
+                    });
+                    tableBody.innerHTML = html;
+                }
+
+                function updateStatusUI(enabled) {
+                    if (enabled) {
+                        whitelistStatus.textContent = '已启用';
+                        whitelistStatus.className = 'status-badge status-enabled';
+                    } else {
+                        whitelistStatus.textContent = '已禁用';
+                        whitelistStatus.className = 'status-badge status-disabled';
+                    }
+                }
+
+                // 切换白名单状态
+                toggleCheckbox.addEventListener('change', async function() {
+                    const enabled = this.checked;
+                    try {
+                        const res = await fetch('/api/whitelist/status', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ enabled })
+                        });
+                        if (res.ok) {
+                            updateStatusUI(enabled);
+                        } else {
+                            this.checked = !enabled; // 回退
+                            alert('更新状态失败');
+                        }
+                    } catch (e) {
+                        this.checked = !enabled;
+                        alert('网络错误');
+                    }
+                });
+
+                // 添加白名单人员
+                addBtn.addEventListener('click', async () => {
+                    const input = newNameInput.value.trim();
+                    if (!input) {
+                        alert('请输入姓名');
+                        return;
+                    }
+                    // 支持逗号分隔多个姓名
+                    const names = input.split(',').map(s => s.trim()).filter(s => s);
+                    if (names.length === 0) return;
+
+                    try {
+                        const res = await fetch('/api/whitelist/add', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ names })
+                        });
+                        if (res.ok) {
+                            alert('添加成功');
+                            newNameInput.value = '';
+                            await loadWhitelist();
+                        } else {
+                            const err = await res.json();
+                            alert('添加失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // 移除白名单人员（事件委托）
+                tableBody.addEventListener('click', async (e) => {
+                    const btn = e.target.closest('.remove-btn');
+                    if (btn) {
+                        const name = btn.dataset.name;
+                        if (!confirm(`确定将 "${name}" 移出白名单吗？`)) return;
+                        try {
+                            const res = await fetch(`/api/whitelist/remove?name=${encodeURIComponent(name)}`, {
+                                method: 'DELETE'
+                            });
+                            if (res.ok) {
+                                await loadWhitelist();
+                            } else {
+                                const err = await res.json();
+                                alert('移除失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    }
+                });
+
+                // 初始加载
+                loadWhitelistStatus();
+                loadWhitelist();
+            });
+        })();
+    </script>
+</body>
+</html>
