@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>课程表 · 手机版</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #f1f5f9;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 12px;
+        }
+        .card {
+            max-width: 480px;
+            width: 100%;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            padding: 20px 18px;
+        }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 18px;
+            border-left: 6px solid #3b82f6;
+            padding-left: 16px;
+        }
+        .name-bar {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            background: #f8fafc;
+            padding: 12px 14px;
+            border-radius: 40px;
+            margin-bottom: 14px;
+            border: 1px solid #e2e8f0;
+        }
+        .name-bar input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            font-size: 1rem;
+            padding: 8px 4px;
+            outline: none;
+            border-bottom: 2px solid #cbd5e1;
+            min-width: 0;
+        }
+        .name-bar input:focus {
+            border-bottom-color: #3b82f6;
+        }
+        .name-bar button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            border: 1px solid #2563eb;
+            white-space: nowrap;
+        }
+        .auth-status {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 0 4px 12px 4px;
+            color: #475569;
+            font-size: 0.9rem;
+            border-bottom: 1px dashed #cbd5e1;
+            margin-bottom: 14px;
+        }
+        .auth-status button {
+            background: #f1f5f9;
+            color: #0f172a;
+            border: 1px solid #cbd5e1;
+            padding: 5px 14px;
+            border-radius: 30px;
+            font-size: 0.85rem;
+            cursor: pointer;
+        }
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .list-header h2 {
+            font-size: 1.4rem;
+            font-weight: 500;
+            color: #334155;
+        }
+        .add-btn {
+            background: white;
+            border: 2px dashed #3b82f6;
+            color: #3b82f6;
+            font-size: 1.5rem;
+            width: 52px;
+            height: 52px;
+            border-radius: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        .course-list {
+            list-style: none;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        .course-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 14px 16px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .course-item:last-child {
+            border-bottom: none;
+        }
+        .course-info {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 12px;
+            font-size: 0.9rem;
+        }
+        .badge {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 4px 10px;
+            border-radius: 30px;
+            font-weight: 500;
+        }
+        .delete-btn {
+            background: none;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
+            width: 38px;
+            height: 38px;
+            border-radius: 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+            padding: 16px;
+        }
+        .modal.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-content {
+            background: white;
+            width: 100%;
+            max-width: 420px;
+            border-radius: 32px;
+            padding: 28px 22px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        .modal-content h3 {
+            margin-top: 0;
+            font-size: 1.6rem;
+            color: #0f172a;
+            margin-bottom: 20px;
+        }
+        .field-row {
+            margin-bottom: 20px;
+        }
+        .field-row label {
+            font-weight: 500;
+            color: #334155;
+            display: block;
+            margin-bottom: 6px;
+            font-size: 1rem;
+        }
+        .row-flex {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .row-flex input[type="number"] {
+            flex: 1;
+            min-width: 100px;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 30px;
+            font-size: 1rem;
+        }
+        .radio-group, .week-grid {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .radio-group label, .week-grid label {
+            background: #f1f5f9;
+            padding: 8px 14px;
+            border-radius: 36px;
+            border: 1px solid #cbd5e1;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 28px;
+        }
+        .modal-actions button {
+            padding: 12px 24px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            flex: 1;
+        }
+        .modal-actions .cancel {
+            background: #e2e8f0;
+            color: #1e293b;
+        }
+        .modal-actions .confirm {
+            background: #3b82f6;
+            color: white;
+        }
+        .info-text {
+            color: #475569;
+            font-size: 0.85rem;
+            margin-top: 4px;
+        }
+        /* 密码模态框紧凑 */
+        #passwordModal .modal-content {
+            max-width: 360px;
+        }
+        #loadPresetBtn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 40px;
+            font-size: 1rem;
+            margin-top: 12px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>📱 课程表 · 手机版</h1>
+        <div class="name-bar">
+            <input type="text" id="studentName" placeholder="输入姓名" autocomplete="off">
+            <button id="loadCoursesBtn">加载</button>
+        </div>
+
+        <!-- 密码状态区域 -->
+        <div class="auth-status" id="authStatus" style="display: none;">
+            <span id="authMessage"></span>
+            <button id="authActionBtn"></button>
+            <button id="logoutBtn" style="display: none;">退出</button>
+            <button id="changePasswordBtn" style="display: none;">修改密码</button>
+        </div>
+
+        <div class="list-header">
+            <h2>📌 课程列表</h2>
+            <div class="add-btn" id="openAddModalBtn">+</div>
+        </div>
+        <ul class="course-list" id="courseListContainer">
+            <li style="padding: 30px; text-align: center; color: #64748b;">👆 输入姓名并加载</li>
+        </ul>
+    </div>
+
+    <!-- 添加课程模态框（无网格辅助） -->
+    <div class="modal" id="courseModal">
+        <div class="modal-content">
+            <h3>➕ 添加课程</h3>
+            <div class="field-row">
+                <label>📅 起止周</label>
+                <div class="row-flex">
+                    <input type="number" id="startWeek" min="1" value="1" placeholder="开始">
+                    <span style="font-size:1.2rem;">—</span>
+                    <input type="number" id="endWeek" min="1" value="16" placeholder="结束">
+                </div>
+            </div>
+            <div class="field-row">
+                <label>🔁 单双周</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="weekType" value="all" checked> 全部</label>
+                    <label><input type="radio" name="weekType" value="odd"> 单周</label>
+                    <label><input type="radio" name="weekType" value="even"> 双周</label>
+                </div>
+            </div>
+            <div class="field-row">
+                <label>📆 星期</label>
+                <div class="week-grid">
+                    <label><input type="radio" name="weekday" value="1" checked> 一</label>
+                    <label><input type="radio" name="weekday" value="2"> 二</label>
+                    <label><input type="radio" name="weekday" value="3"> 三</label>
+                    <label><input type="radio" name="weekday" value="4"> 四</label>
+                    <label><input type="radio" name="weekday" value="5"> 五</label>
+                    <label><input type="radio" name="weekday" value="6"> 六</label>
+                    <label><input type="radio" name="weekday" value="7"> 日</label>
+                </div>
+            </div>
+            <div class="field-row">
+                <label>⏰ 节次范围</label>
+                <div class="row-flex">
+                    <input type="number" id="startPeriod" min="1" max="12" value="1" placeholder="开始节">
+                    <span>—</span>
+                    <input type="number" id="endPeriod" min="1" max="12" value="2" placeholder="结束节">
+                </div>
+                <p class="info-text">直接输入数字（1-12）</p>
+            </div>
+            <div class="modal-actions">
+                <button class="cancel" id="closeModalBtn">取消</button>
+                <button class="confirm" id="saveCourseBtn">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 密码/登录模态框（与原来相同，但样式已适配） -->
+    <div class="modal" id="passwordModal">
+        <div class="modal-content">
+            <h3 id="passwordModalTitle">设置密码</h3>
+            <div class="field-row" id="oldPasswordRow" style="display: none;">
+                <label>旧密码</label>
+                <input type="password" id="oldPasswordInput" placeholder="输入旧密码">
+            </div>
+            <div class="field-row">
+                <label id="passwordLabel">新密码</label>
+                <input type="password" id="passwordInput1" placeholder="输入密码">
+            </div>
+            <div class="modal-actions">
+                <button class="cancel" id="closePasswordModalBtn">取消</button>
+                <button class="confirm" id="confirmPasswordBtn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                // ---------- 状态 ----------
+                let currentName = '';
+                let courses = [];
+                let hasPassword = false;
+                let authenticated = false;
+
+                // DOM 元素
+                const nameInput = document.getElementById('studentName');
+                const loadBtn = document.getElementById('loadCoursesBtn');
+                const courseListEl = document.getElementById('courseListContainer');
+                const openModalBtn = document.getElementById('openAddModalBtn');
+                const courseModal = document.getElementById('courseModal');
+                const closeModalBtn = document.getElementById('closeModalBtn');
+                const saveCourseBtn = document.getElementById('saveCourseBtn');
+                const passwordModal = document.getElementById('passwordModal');
+                const passwordModalTitle = document.getElementById('passwordModalTitle');
+                const passwordLabel = document.getElementById('passwordLabel');
+                const passwordInput1 = document.getElementById('passwordInput1');
+                const oldPasswordInput = document.getElementById('oldPasswordInput');
+                const oldPasswordRow = document.getElementById('oldPasswordRow');
+                const confirmPasswordBtn = document.getElementById('confirmPasswordBtn');
+                const closePasswordModalBtn = document.getElementById('closePasswordModalBtn');
+                const authStatusDiv = document.getElementById('authStatus');
+                const authMessageSpan = document.getElementById('authMessage');
+                const authActionBtn = document.getElementById('authActionBtn');
+                const logoutBtn = document.getElementById('logoutBtn');
+                const changePasswordBtn = document.getElementById('changePasswordBtn');
+
+                // 课程表单元素
+                const startWeekInp = document.getElementById('startWeek');
+                const endWeekInp = document.getElementById('endWeek');
+                const weekTypeRadios = document.getElementsByName('weekType');
+                const weekdayRadios = document.getElementsByName('weekday');
+                const startPeriodInp = document.getElementById('startPeriod');
+                const endPeriodInp = document.getElementById('endPeriod');
+
+                // 简单验证节次范围
+                [startPeriodInp, endPeriodInp].forEach(inp => {
+                    inp.addEventListener('change', () => {
+                        let s = parseInt(startPeriodInp.value) || 1;
+                        let e = parseInt(endPeriodInp.value) || 2;
+                        if (s > e) endPeriodInp.value = s;
+                        if (s < 1) startPeriodInp.value = 1;
+                        if (e > 12) endPeriodInp.value = 12;
+                    });
+                });
+
+                // ---------- 加载课程 ----------
+                async function fetchCourses(name) {
+                    if (!name.trim()) return false;
+                    try {
+                        const response = await fetch(`/api/courses?student=${encodeURIComponent(name)}`);
+                        if (!response.ok) throw new Error('加载失败');
+                        const data = await response.json();
+                        courses = data.courses;
+                        hasPassword = data.has_password;
+                        currentName = name.trim();
+                        await checkAuthStatus();
+                        renderCourseList();
+                        return true;
+                    } catch (e) {
+                        alert('加载失败：' + e.message);
+                        return false;
+                    }
+                }
+
+                // ---------- 检查认证状态 ----------
+                async function checkAuthStatus() {
+                    if (!currentName) return;
+                    try {
+                        const res = await fetch(`/api/student/check_auth?name=${encodeURIComponent(currentName)}`);
+                        const data = await res.json();
+                        authenticated = data.authenticated;
+                        updateAuthUI();
+                    } catch (e) {
+                        console.error('检查认证失败', e);
+                    }
+                }
+
+                function updateAuthUI() {
+                    if (!currentName) {
+                        authStatusDiv.style.display = 'none';
+                        return;
+                    }
+                    authStatusDiv.style.display = 'flex';
+                    if (authenticated) {
+                        authMessageSpan.textContent = `✅ 已认证 (${currentName})`;
+                        authActionBtn.style.display = 'none';
+                        logoutBtn.style.display = 'inline-block';
+                        changePasswordBtn.style.display = 'inline-block';
+                    } else {
+                        if (hasPassword) {
+                            authMessageSpan.textContent = `🔒 需要密码 (${currentName})`;
+                            authActionBtn.textContent = '登录';
+                        } else {
+                            authMessageSpan.textContent = `⚠️ 未设置密码 (${currentName})`;
+                            authActionBtn.textContent = '设置密码';
+                        }
+                        authActionBtn.style.display = 'inline-block';
+                        logoutBtn.style.display = 'none';
+                        changePasswordBtn.style.display = 'none';
+                    }
+                }
+
+                // ---------- 登出 ----------
+                logoutBtn.addEventListener('click', async () => {
+                    await fetch('/api/student/logout', { method: 'POST' });
+                    authenticated = false;
+                    updateAuthUI();
+                    renderCourseList();
+                });
+
+                // ---------- 密码模态框 ----------
+                authActionBtn.addEventListener('click', () => {
+                    if (!currentName) return;
+                    if (hasPassword) {
+                        openPasswordModal('login');
+                    } else {
+                        openPasswordModal('set');
+                    }
+                });
+
+                changePasswordBtn.addEventListener('click', () => {
+                    if (!currentName) return;
+                    openPasswordModal('change');
+                });
+
+                function openPasswordModal(mode) {  // 'login', 'set', 'change'
+                    passwordInput1.value = '';
+                    oldPasswordInput.value = '';
+                    if (mode === 'login') {
+                        passwordModalTitle.textContent = '登录';
+                        passwordLabel.textContent = '密码';
+                        oldPasswordRow.style.display = 'none';
+                    } else if (mode === 'set') {
+                        passwordModalTitle.textContent = '设置密码';
+                        passwordLabel.textContent = '新密码';
+                        oldPasswordRow.style.display = hasPassword ? 'flex' : 'none';
+                    } else if (mode === 'change') {
+                        passwordModalTitle.textContent = '修改密码';
+                        passwordLabel.textContent = '新密码';
+                        oldPasswordRow.style.display = '';
+                    }
+                    passwordModal.classList.add('show');
+                }
+
+                closePasswordModalBtn.addEventListener('click', () => {
+                    passwordModal.classList.remove('show');
+                });
+                passwordModal.addEventListener('click', (e) => {
+                    if (e.target === passwordModal) passwordModal.classList.remove('show');
+                });
+
+                confirmPasswordBtn.addEventListener('click', async () => {
+                    const password = passwordInput1.value.trim();
+                    if (!password) {
+                        alert('请输入密码');
+                        return;
+                    }
+                    const isLogin = passwordModalTitle.textContent === '登录';
+                    const isChange = passwordModalTitle.textContent === '修改密码';
+                    let url, body;
+                    if (isLogin) {
+                        url = '/api/student/login';
+                        body = { name: currentName, password };
+                    } else {
+                        url = '/api/student/set_password';
+                        body = { name: currentName, new_password: password };
+                        if (hasPassword || isChange) {
+                            const oldPw = oldPasswordInput.value.trim();
+                            if (!oldPw) {
+                                alert('请输入旧密码');
+                                return;
+                            }
+                            body.old_password = oldPw;
+                        }
+                    }
+                    try {
+                        const res = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(body)
+                        });
+                        if (res.ok) {
+                            alert(isLogin ? '登录成功' : '密码设置成功');
+                            passwordModal.classList.remove('show');
+                            if (!isLogin) hasPassword = true;
+                            await checkAuthStatus();
+                            renderCourseList();
+                        } else {
+                            const err = await res.json();
+                            alert('操作失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // ---------- 渲染课程列表 ----------
+                function renderCourseList() {
+                    if (!courseListEl) return;
+                    if (!courses || courses.length === 0) {
+                        let emptyHtml = `<li style="padding: 30px; text-align: center; color: #64748b;">📭 暂无课程`;
+                        if (authenticated) {
+                            emptyHtml += `<br><button id="loadPresetBtn" style="margin-top:12px; background:#3b82f6; color:white; border:none; padding:8px 24px; border-radius:40px;">📋 加载预置课程</button>`;
+                        } else {
+                            emptyHtml += `，请登录后添加`;
+                        }
+                        emptyHtml += `</li>`;
+                        courseListEl.innerHTML = emptyHtml;
+
+                        const loadPresetBtn = document.getElementById('loadPresetBtn');
+                        if (loadPresetBtn) {
+                            loadPresetBtn.addEventListener('click', loadPresetCourses);
+                        }
+                        return;
+                    }
+
+                    // 排序
+                    const sortedIndices = courses
+                        .map((_, idx) => idx)
+                        .sort((i, j) => {
+                            const a = courses[i], b = courses[j];
+                            if (a.weekday !== b.weekday) return a.weekday - b.weekday;
+                            return a.startPeriod - b.startPeriod;
+                        });
+
+                    let html = '';
+                    sortedIndices.forEach(originalIndex => {
+                        const c = courses[originalIndex];
+                        const weekTypeMap = { 'all': '全部', 'odd': '单周', 'even': '双周' };
+                        const weekDays = ['周一','周二','周三','周四','周五','周六','周日'];
+                        const wd = weekDays[c.weekday-1] || '?';
+                        html += `<li class="course-item">
+                            <div class="course-info">
+                                <span class="badge">第${c.startWeek}-${c.endWeek}周</span>
+                                <span class="badge">${weekTypeMap[c.weekType]}</span>
+                                <span class="badge">${wd}</span>
+                                <span class="badge">${c.startPeriod}-${c.endPeriod}节</span>
+                            </div>`;
+                        if (authenticated) {
+                            html += `<button class="delete-btn" data-index="${originalIndex}">✕</button>`;
+                        } else {
+                            html += `<span style="width:38px;"></span>`;
+                        }
+                        html += `</li>`;
+                    });
+                    courseListEl.innerHTML = html;
+                }
+
+                // ---------- 保存课程 ----------
+                async function saveCurrentCourses() {
+                    if (!currentName) return;
+                    try {
+                        await fetch('/api/courses', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ student: currentName, courses: courses })
+                        });
+                    } catch (e) {
+                        alert('保存失败：' + e.message);
+                    }
+                }
+
+                // ---------- 删除 ----------
+                courseListEl.addEventListener('click', async (e) => {
+                    const deleteBtn = e.target.closest('.delete-btn');
+                    if (deleteBtn) {
+                        if (!authenticated) {
+                            alert('请先登录后再删除课程');
+                            return;
+                        }
+                        const idx = deleteBtn.dataset.index;
+                        if (idx !== undefined) {
+                            courses.splice(idx, 1);
+                            await saveCurrentCourses();
+                            renderCourseList();
+                        }
+                    }
+                });
+
+                // ---------- 加载预置课程 ----------
+                async function loadPresetCourses() {
+                    if (!currentName || !authenticated) return;
+                    if (!confirm('确定加载预置课程吗？这将添加当前所有预置课程到你的课表中。')) return;
+                    try {
+                        const res = await fetch('/api/student/load_preset', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: currentName })
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.count === 0) {
+                                alert('当前没有预置课程可加载');
+                            } else {
+                                alert(`预置课程加载成功，共 ${data.count} 门`);
+                                await fetchCourses(currentName);
+                            }
+                        } else {
+                            const err = await res.json();
+                            alert('加载失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                }
+
+                // ---------- 加载按钮 ----------
+                loadBtn.addEventListener('click', async () => {
+                    const name = nameInput.value.trim();
+                    if (name) {
+                        await fetchCourses(name);
+                    } else {
+                        alert('请输入姓名');
+                    }
+                });
+
+                // ---------- 打开添加课程模态框 ----------
+                openModalBtn.addEventListener('click', () => {
+                    if (!currentName) {
+                        alert('请先加载姓名');
+                        return;
+                    }
+                    if (!authenticated) {
+                        alert('请先登录后再添加课程');
+                        return;
+                    }
+                    // 重置表单
+                    startWeekInp.value = 1;
+                    endWeekInp.value = 16;
+                    document.querySelector('input[name="weekType"][value="all"]').checked = true;
+                    document.querySelector('input[name="weekday"][value="1"]').checked = true;
+                    startPeriodInp.value = 1;
+                    endPeriodInp.value = 2;
+                    courseModal.classList.add('show');
+                });
+
+                closeModalBtn.addEventListener('click', () => {
+                    courseModal.classList.remove('show');
+                });
+                courseModal.addEventListener('click', (e) => {
+                    if (e.target === courseModal) courseModal.classList.remove('show');
+                });
+
+                saveCourseBtn.addEventListener('click', async () => {
+                    const startWeek = parseInt(startWeekInp.value);
+                    const endWeek = parseInt(endWeekInp.value);
+                    if (startWeek > endWeek || startWeek < 1) {
+                        alert('开始周必须≤结束周且≥1');
+                        return;
+                    }
+                    let weekType = 'all';
+                    for (let r of weekTypeRadios) if (r.checked) weekType = r.value;
+                    let weekday = 1;
+                    for (let r of weekdayRadios) if (r.checked) weekday = parseInt(r.value);
+                    const startPeriod = parseInt(startPeriodInp.value);
+                    const endPeriod = parseInt(endPeriodInp.value);
+                    if (startPeriod > endPeriod || startPeriod < 1 || endPeriod > 12) {
+                        alert('节次范围不正确 (1-12，开始≤结束)');
+                        return;
+                    }
+
+                    const newCourse = { startWeek, endWeek, weekType, weekday, startPeriod, endPeriod };
+                    courses.push(newCourse);
+                    await saveCurrentCourses();
+                    renderCourseList();
+                    courseModal.classList.remove('show');
+                });
+            });
+        })();
+    </script>
+</body>
+</html>
