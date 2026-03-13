@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库备份与还原</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            background: #0f172a;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+        .backup-card {
+            max-width: 900px;
+            width: 100%;
+            background: white;
+            border-radius: 40px;
+            box-shadow: 0 25px 50px -12px black;
+            padding: 32px 36px;
+        }
+        h2 {
+            font-size: 2rem;
+            color: #0f172a;
+            font-weight: 600;
+            margin-top: 0;
+            margin-bottom: 28px;
+            border-left: 8px solid #3b82f6;
+            padding-left: 24px;
+        }
+        .toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: 0.1s;
+            border: 1px solid #2563eb;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        .danger-btn {
+            background: #ef4444;
+            border-color: #b91c1c;
+        }
+        .danger-btn:hover {
+            background: #b91c1c;
+        }
+        .back-link {
+            margin-bottom: 20px;
+        }
+        .back-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .backup-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 24px;
+            overflow: hidden;
+        }
+        .backup-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            background: white;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .backup-item:last-child {
+            border-bottom: none;
+        }
+        .backup-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .backup-name {
+            font-weight: 500;
+            color: #0f172a;
+        }
+        .backup-date {
+            font-size: 0.85rem;
+            color: #64748b;
+        }
+        .backup-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .backup-actions button {
+            padding: 8px 16px;
+            font-size: 0.9rem;
+        }
+        .restore-btn {
+            background: #10b981;
+            border-color: #059669;
+        }
+        .restore-btn:hover {
+            background: #059669;
+        }
+        .delete-btn {
+            background: #ef4444;
+            border-color: #b91c1c;
+        }
+        .empty-message {
+            padding: 40px;
+            text-align: center;
+            color: #64748b;
+        }
+        .loading {
+            padding: 40px;
+            text-align: center;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="backup-card">
+        <div class="back-link">
+            <a href="/admin">← 返回管理后台</a>
+        </div>
+        <h2>💾 数据库备份与还原</h2>
+        <div class="toolbar">
+            <div class="btn-group">
+                <button id="createBackupBtn">➕ 创建新备份</button>
+            </div>
+            <span id="backupCount" style="color:#64748b;">共 0 个备份</span>
+        </div>
+        <ul class="backup-list" id="backupList">
+            <li class="loading">加载中...</li>
+        </ul>
+    </div>
+
+    <script>
+        (function() {
+            document.addEventListener('DOMContentLoaded', function() {
+                const backupListEl = document.getElementById('backupList');
+                const backupCountSpan = document.getElementById('backupCount');
+                const createBtn = document.getElementById('createBackupBtn');
+
+                // 检查登录状态（若未登录，跳转回 admin）
+                async function checkAuth() {
+                    try {
+                        const res = await fetch('/api/admin/check_setup');
+                        if (res.ok) {
+                            // 已设置密码，但不知道是否已登录；调用一个需要登录的接口验证
+                            const authRes = await fetch('/api/backup/list');
+                            if (authRes.status === 401) {
+                                window.location.href = '/admin';
+                            }
+                        } else {
+                            window.location.href = '/admin';
+                        }
+                    } catch (e) {
+                        window.location.href = '/admin';
+                    }
+                }
+                checkAuth();
+
+                // 加载备份列表
+                async function loadBackups() {
+                    try {
+                        const res = await fetch('/api/backup/list');
+                        if (res.status === 401) {
+                            window.location.href = '/admin';
+                            return;
+                        }
+                        if (!res.ok) throw new Error('加载失败');
+                        const backups = await res.json();
+                        renderBackupList(backups);
+                    } catch (e) {
+                        backupListEl.innerHTML = `<li class="empty-message">加载失败：${e.message}</li>`;
+                    }
+                }
+
+                // 渲染备份列表
+                function renderBackupList(backups) {
+                    if (backups.length === 0) {
+                        backupListEl.innerHTML = '<li class="empty-message">暂无备份文件，点击上方创建备份</li>';
+                        backupCountSpan.textContent = '共 0 个备份';
+                        return;
+                    }
+                    let html = '';
+                    backups.forEach(filename => {
+                        // 解析文件名中的时间戳（格式：database_backup_YYYYMMDDHHMMSS_action.db）
+                        const match = filename.match(/database_backup_(\d{14})_(.+)\.db/);
+                        let displayName = filename;
+                        let dateStr = '';
+                        if (match) {
+                            const timestamp = match[1];
+                            const action = match[2];
+                            const year = timestamp.slice(0,4);
+                            const month = timestamp.slice(4,6);
+                            const day = timestamp.slice(6,8);
+                            const hour = timestamp.slice(8,10);
+                            const minute = timestamp.slice(10,12);
+                            const second = timestamp.slice(12,14);
+                            dateStr = `${year}-${month}-${day} ${hour}:${minute}:${second} (${action})`;
+                        }
+                        html += `<li class="backup-item">
+                            <div class="backup-info">
+                                <span class="backup-name">${displayName}</span>
+                                <span class="backup-date">${dateStr || '未知时间'}</span>
+                            </div>
+                            <div class="backup-actions">
+                                <button class="restore-btn" data-file="${filename}">还原</button>
+                                <button class="delete-btn" data-file="${filename}">删除</button>
+                            </div>
+                        </li>`;
+                    });
+                    backupListEl.innerHTML = html;
+                    backupCountSpan.textContent = `共 ${backups.length} 个备份`;
+                }
+
+                // 创建备份
+                createBtn.addEventListener('click', async () => {
+                    if (!confirm('确定创建新的数据库备份吗？')) return;
+                    try {
+                        const res = await fetch('/api/backup/create', { method: 'POST' });
+                        if (res.ok) {
+                            alert('备份创建成功');
+                            loadBackups();
+                        } else {
+                            const err = await res.json();
+                            alert('创建失败：' + (err.error || ''));
+                        }
+                    } catch (e) {
+                        alert('网络错误');
+                    }
+                });
+
+                // 事件委托处理还原和删除
+                backupListEl.addEventListener('click', async (e) => {
+                    const target = e.target;
+                    if (target.classList.contains('restore-btn')) {
+                        const filename = target.dataset.file;
+                        if (!confirm(`确定要还原备份文件 "${filename}" 吗？当前数据库将被覆盖，且会自动创建一个备份。`)) return;
+                        try {
+                            const res = await fetch('/api/backup/restore', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ filename })
+                            });
+                            if (res.ok) {
+                                alert('还原成功');
+                                loadBackups();  // 刷新列表（因为自动创建了 before_restore 备份）
+                            } else {
+                                const err = await res.json();
+                                alert('还原失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    } else if (target.classList.contains('delete-btn')) {
+                        const filename = target.dataset.file;
+                        if (!confirm(`确定删除备份文件 "${filename}" 吗？`)) return;
+                        try {
+                            const res = await fetch(`/api/backup/${encodeURIComponent(filename)}`, {
+                                method: 'DELETE'
+                            });
+                            if (res.ok) {
+                                alert('删除成功');
+                                loadBackups();
+                            } else {
+                                const err = await res.json();
+                                alert('删除失败：' + (err.error || ''));
+                            }
+                        } catch (e) {
+                            alert('网络错误');
+                        }
+                    }
+                });
+
+                // 初始加载
+                loadBackups();
+            });
+        })();
+    </script>
+</body>
+</html>
