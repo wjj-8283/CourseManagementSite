@@ -1,28 +1,55 @@
 import sqlite3
+import time
+import os
+import shutil
 from flask import Flask, render_template, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# 确保 backup 目录存在
+os.makedirs('backup', exist_ok=True)
+def copy_file(src, dst):
+    try:
+        # 检查源文件是否存在
+        if os.path.exists(src):
+            # 复制文件
+            shutil.copy2(src, dst)
+            print(f"文件 {src} 复制到 {dst} 成功")
+        else:
+            print(f"源文件 {src} 不存在")
+    except Exception as e:
+        print(f"文件复制失败: {e}")
+
+def backup_db(action):
+    current_time = time.strftime('%Y%m%d%H%M%S', time.localtime())
+    sep = os.sep
+    backup_file = f"backup{sep}database_backup_{current_time}_{action}.db"
+    copy_file('database.db', backup_file)
+
 app = Flask(__name__)
-app.secret_key = 'your-very-secret-key-change-this'  # 请务必修改为随机字符串
+app.secret_key = 'ka9wjdpmxmjaipodadjkfsaoidaspoas0dialksajkn2kjoijau9sjdjkhshdakjd'  # 请务必修改为随机字符串
 
 # 数据库初始化
 def init_db():
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    # 学生课程表
-    c.execute('''CREATE TABLE IF NOT EXISTS courses
+    # 修改 students 表，添加 password_hash 字段
+    c.execute('''CREATE TABLE IF NOT EXISTS students
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  student_name TEXT NOT NULL,
-                  start_week INTEGER NOT NULL,
-                  end_week INTEGER NOT NULL,
-                  week_type TEXT NOT NULL,
-                  weekday INTEGER NOT NULL,
-                  start_period INTEGER NOT NULL,
-                  end_period INTEGER NOT NULL)''')
+                  student_name TEXT UNIQUE NOT NULL,
+                  password_hash TEXT,
+                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
+    
+    # 如果表已存在但缺少 password_hash 列，则添加
+    c.execute("PRAGMA table_info(students)")
+    columns = [col[1] for col in c.fetchall()]
+    if 'password_hash' not in columns:
+        c.execute("ALTER TABLE students ADD COLUMN password_hash TEXT")
+
     # 管理员表 (只存一条记录)
     c.execute('''CREATE TABLE IF NOT EXISTS admin
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
                   password_hash TEXT NOT NULL)''')
+    
     # 学生记录表（用于判断是否首次使用）
     c.execute('''CREATE TABLE IF NOT EXISTS students
                  (id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,46 +92,37 @@ def get_courses():
 
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    # 检查学生是否存在
-    c.execute('SELECT 1 FROM students WHERE student_name = ?', (student,))
-    exists = c.fetchone()
-
-    if not exists:
-        # 首次使用：获取所有预置课程并插入到该学生名下
+    c.execute('SELECT password_hash FROM students WHERE student_name = ?', (student,))
+    row = c.fetchone()
+    if row is None:
+        # 首次使用：创建学生记录（无密码），并插入预置课程
+        c.execute('INSERT INTO students (student_name) VALUES (?)', (student,))
         c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM preset_courses')
         preset_rows = c.fetchall()
-        for row in preset_rows:
+        for pr in preset_rows:
             c.execute('''INSERT INTO courses 
                          (student_name, start_week, end_week, week_type, weekday, start_period, end_period)
                          VALUES (?,?,?,?,?,?,?)''',
-                      (student, row[0], row[1], row[2], row[3], row[4], row[5]))
-        # 记录学生
-        c.execute('INSERT INTO students (student_name) VALUES (?)', (student,))
+                      (student, pr[0], pr[1], pr[2], pr[3], pr[4], pr[5]))
         conn.commit()
+        has_password = False
         courses = [{
-            'startWeek': row[0],
-            'endWeek': row[1],
-            'weekType': row[2],
-            'weekday': row[3],
-            'startPeriod': row[4],
-            'endPeriod': row[5]
-        } for row in preset_rows]
-        conn.close()
-        return jsonify(courses)
+            'startWeek': pr[0], 'endWeek': pr[1], 'weekType': pr[2],
+            'weekday': pr[3], 'startPeriod': pr[4], 'endPeriod': pr[5]
+        } for pr in preset_rows]
     else:
-        # 已有学生：返回其课程
+        has_password = row[0] is not None
+        # 获取该学生的课程
         c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM courses WHERE student_name=?', (student,))
         rows = c.fetchall()
-        conn.close()
         courses = [{
-            'startWeek': row[0],
-            'endWeek': row[1],
-            'weekType': row[2],
-            'weekday': row[3],
-            'startPeriod': row[4],
-            'endPeriod': row[5]
-        } for row in rows]
-        return jsonify(courses)
+            'startWeek': r[0], 'endWeek': r[1], 'weekType': r[2],
+            'weekday': r[3], 'startPeriod': r[4], 'endPeriod': r[5]
+        } for r in rows]
+    conn.close()
+    return jsonify({'courses': courses, 'has_password': has_password})
+
+
 
 @app.route('/api/courses', methods=['POST'])
 def save_courses():
@@ -114,22 +132,52 @@ def save_courses():
     if not student:
         return jsonify({'error': 'Missing student name'}), 400
 
+    # 验证当前会话是否已认证为该学生
+    if session.get('student_name') != student:
+        return jsonify({'error': 'Unauthorized, please login first'}), 401
+
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
-    # 先删除该学生原有课程
     c.execute('DELETE FROM courses WHERE student_name=?', (student,))
-    # 插入新课程
     for crs in courses:
         c.execute('''INSERT INTO courses 
                      (student_name, start_week, end_week, week_type, weekday, start_period, end_period)
                      VALUES (?,?,?,?,?,?,?)''',
                   (student, crs['startWeek'], crs['endWeek'], crs['weekType'],
                    crs['weekday'], crs['startPeriod'], crs['endPeriod']))
-    # 确保学生记录存在
     c.execute('INSERT OR IGNORE INTO students (student_name) VALUES (?)', (student,))
     conn.commit()
     conn.close()
     return jsonify({'status': 'ok'})
+
+@app.route('/api/student/load_preset', methods=['POST'])
+def student_load_preset():
+    data = request.json
+    student = data.get('name')
+    if not student:
+        return jsonify({'error': 'Missing student name'}), 400
+    # 验证会话
+    if session.get('student_name') != student:
+        return jsonify({'error': 'Unauthorized'}), 401
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    # 检查学生是否存在
+    c.execute('SELECT 1 FROM students WHERE student_name = ?', (student,))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'error': 'Student not found'}), 404
+    # 获取所有预置课程
+    c.execute('SELECT start_week, end_week, week_type, weekday, start_period, end_period FROM preset_courses')
+    preset_rows = c.fetchall()
+    # 为当前学生插入这些课程
+    for row in preset_rows:
+        c.execute('''INSERT INTO courses 
+                     (student_name, start_week, end_week, week_type, weekday, start_period, end_period)
+                     VALUES (?,?,?,?,?,?,?)''',
+                  (student, row[0], row[1], row[2], row[3], row[4], row[5]))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok', 'count': len(preset_rows)})
 
 # ---------- API：管理员登录、密码设置、数据获取 ----------
 @app.route('/api/admin/check_setup', methods=['GET'])
@@ -303,6 +351,7 @@ def delete_preset_course(course_id):
 def delete_course(course_id):
     if not session.get('admin_logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401
+    backup_db(f"delete_course_{course_id}")
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute('DELETE FROM courses WHERE id = ?', (course_id,))
@@ -310,13 +359,14 @@ def delete_course(course_id):
     conn.close()
     return jsonify({'status': 'ok'})
 
-@app.route('/api/admin/student_courses', methods=['DELETE'])
-def delete_student_courses():
+@app.route('/api/admin/student', methods=['DELETE'])
+def delete_student():
     if not session.get('admin_logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401
     student_name = request.args.get('name')
     if not student_name:
         return jsonify({'error': 'Missing student name'}), 400
+    backup_db(f"delete_student_{student_name}")
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute('DELETE FROM courses WHERE student_name = ?', (student_name,))
@@ -325,14 +375,184 @@ def delete_student_courses():
     conn.close()
     return jsonify({'status': 'ok'})
 
+@app.route('/api/admin/student2', methods=['DELETE'])
+def delete_student_courses():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    student_name = request.args.get('name')
+    if not student_name:
+        return jsonify({'error': 'Missing student name'}), 400
+    backup_db(f"delete_student_courses_{student_name}")
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('DELETE FROM courses WHERE student_name = ?', (student_name,))
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+
 # 清空所有预置课程
 @app.route('/api/preset_courses/clear', methods=['POST'])
 def clear_preset_courses():
     if not session.get('admin_logged_in'):
         return jsonify({'error': 'Unauthorized'}), 401
+    backup_db(f"clear_preset_courses")
     conn = sqlite3.connect('database.db')
     c = conn.cursor()
     c.execute('DELETE FROM preset_courses')
+    conn.commit()
+    conn.close()
+    return jsonify({'status': 'ok'})
+
+# ---------- 页面路由：备份还原 ----------
+@app.route('/backup_restore')
+def backup_restore():
+    return render_template('backup_restore.html')
+# ---------- API：数据库备份与还原 ----------
+@app.route('/api/backup/list', methods=['GET'])
+def list_backups():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        files = os.listdir('backup')
+        backup_files = [f for f in files if f.endswith('.db') and f.startswith('database_backup_')]
+        backup_files.sort(reverse=True)  # 最新的在前
+        return jsonify(backup_files)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backup/create', methods=['POST'])
+def create_backup():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    try:
+        backup_db('manual')  # 使用已有函数
+        return jsonify({'status': 'ok', 'message': '备份创建成功'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backup/restore', methods=['POST'])
+def restore_backup():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    filename = data.get('filename')
+    if not filename:
+        return jsonify({'error': 'Missing filename'}), 400
+    
+    # 安全校验：防止路径遍历
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+    
+    backup_path = os.path.join('backup', filename)
+    if not os.path.exists(backup_path):
+        return jsonify({'error': 'Backup file not found'}), 404
+    
+    try:
+        # 在还原前先自动备份当前数据库（以防万一）
+        backup_db('before_restore')
+        # 复制备份文件到当前数据库
+        copy_file(backup_path, 'database.db')
+        return jsonify({'status': 'ok', 'message': '还原成功'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backup/<filename>', methods=['DELETE'])
+def delete_backup(filename):
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    if '..' in filename or '/' in filename or '\\' in filename:
+        return jsonify({'error': 'Invalid filename'}), 400
+    
+    backup_path = os.path.join('backup', filename)
+    if not os.path.exists(backup_path):
+        return jsonify({'error': 'Backup file not found'}), 404
+    
+    try:
+        os.remove(backup_path)
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+# ---------- API：学生密码管理 ----------
+@app.route('/api/student/check_auth', methods=['GET'])
+def check_student_auth():
+    name = request.args.get('name')
+    if not name:
+        return jsonify({'error': 'Missing name'}), 400
+    authenticated = session.get('student_name') == name
+    return jsonify({'authenticated': authenticated})
+
+@app.route('/api/student/login', methods=['POST'])
+def student_login():
+    data = request.json
+    name = data.get('name')
+    password = data.get('password')
+    if not name or not password:
+        return jsonify({'error': 'Missing name or password'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('SELECT password_hash FROM students WHERE student_name = ?', (name,))
+    row = c.fetchone()
+    conn.close()
+    if row and row[0] and check_password_hash(row[0], password):
+        session['student_name'] = name
+        return jsonify({'status': 'ok'})
+    else:
+        return jsonify({'error': 'Invalid password or user not found'}), 401
+
+@app.route('/api/student/set_password', methods=['POST'])
+def set_student_password():
+    data = request.json
+    name = data.get('name')
+    new_password = data.get('new_password')
+    old_password = data.get('old_password')  # 如果已有密码则必须提供
+    if not name or not new_password:
+        return jsonify({'error': 'Missing name or new password'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    c.execute('SELECT password_hash FROM students WHERE student_name = ?', (name,))
+    row = c.fetchone()
+    if not row:
+        conn.close()
+        return jsonify({'error': 'Student not found'}), 404
+    current_hash = row[0]
+    if current_hash:
+        # 已有密码，验证旧密码
+        if not old_password or not check_password_hash(current_hash, old_password):
+            conn.close()
+            return jsonify({'error': 'Old password is incorrect'}), 401
+    # 设置新密码
+    new_hash = generate_password_hash(new_password)
+    c.execute('UPDATE students SET password_hash = ? WHERE student_name = ?', (new_hash, name))
+    conn.commit()
+    conn.close()
+    # 自动登录
+    session['student_name'] = name
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/student/logout', methods=['POST'])
+def student_logout():
+    session.pop('student_name', None)
+    return jsonify({'status': 'ok'})
+
+@app.route('/api/admin/reset_password', methods=['POST'])
+def admin_reset_password():
+    if not session.get('admin_logged_in'):
+        return jsonify({'error': 'Unauthorized'}), 401
+    data = request.json
+    student_name = data.get('name')
+    if not student_name:
+        return jsonify({'error': 'Missing student name'}), 400
+    conn = sqlite3.connect('database.db')
+    c = conn.cursor()
+    # 检查学生是否存在
+    c.execute('SELECT 1 FROM students WHERE student_name = ?', (student_name,))
+    if not c.fetchone():
+        conn.close()
+        return jsonify({'error': 'Student not found'}), 404
+    # 将密码哈希置为NULL
+    c.execute('UPDATE students SET password_hash = NULL WHERE student_name = ?', (student_name,))
     conn.commit()
     conn.close()
     return jsonify({'status': 'ok'})
