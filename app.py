@@ -73,6 +73,9 @@ init_db()
 # ---------- 页面路由 ----------
 @app.route('/')
 def index():
+    ua = request.headers.get('User-Agent', '').lower()
+    if 'mobile' in ua or 'android' in ua or 'iphone' in ua:
+        return render_template('index_mobile.html')
     return render_template('index.html')
 
 @app.route('/admin')
